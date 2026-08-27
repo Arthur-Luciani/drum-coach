@@ -1,0 +1,15 @@
+drumcoach:
+  data:
+    # Arquivo SQLite do caderno. Fora da pasta de instalacao do jar de proposito (nao se
+    # perde em upgrades). Sobrescreva com a variavel de ambiente DRUMCOACH_DATA_DBPATH ou
+    # -Ddrumcoach.data.db-path=... se quiser outro local.
+    db-path: "${user.home}/.drum-coach/drum-coach.db"
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: drum-coach
+  flyway:
+    enabled: true

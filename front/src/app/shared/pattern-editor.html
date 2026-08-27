@@ -1,0 +1,98 @@
+@let p = pattern();
+
+<div class="pattern-editor">
+  <app-drum-sheet
+    [pattern]="p"
+    [editable]="true"
+    (patternChange)="onSheetPattern($event)"
+  />
+
+  <div class="pattern-editor__controls">
+    <div class="pe-group">
+      <span class="pe-group__label mono">PRESETS</span>
+      <div class="pe-chips">
+        @for (preset of presets; track preset.key) {
+          <button type="button" class="pe-chip" (click)="applyPreset(preset.key)">
+            {{ preset.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="pe-group">
+      <span class="pe-group__label mono">COMPASSO</span>
+      <div class="pe-inline">
+        <label class="pe-field">
+          <span>num</span>
+          <input
+            type="number"
+            min="1"
+            max="16"
+            [value]="p.timeSignature[0]"
+            (change)="setNumerator($any($event.target).value)"
+          />
+        </label>
+        <span class="pe-slash">/</span>
+        <label class="pe-field">
+          <span>den</span>
+          <select
+            [value]="p.timeSignature[1]"
+            (change)="setDenominator($any($event.target).value)"
+          >
+            @for (d of denominators; track d) {
+              <option [value]="d" [selected]="d === p.timeSignature[1]">{{ d }}</option>
+            }
+          </select>
+        </label>
+        <label class="pe-field">
+          <span>steps/tempo</span>
+          <input
+            type="number"
+            min="1"
+            max="8"
+            [value]="p.stepsPerBeat"
+            (change)="setStepsPerBeat($any($event.target).value)"
+          />
+        </label>
+        <label class="pe-field">
+          <span>compassos</span>
+          <input
+            type="number"
+            min="1"
+            max="8"
+            [value]="p.bars"
+            (change)="setBars($any($event.target).value)"
+          />
+        </label>
+        <button
+          type="button"
+          class="pe-toggle"
+          [class.pe-toggle--on]="p.tuplet"
+          (click)="toggleTuplet()"
+        >
+          tercina {{ p.tuplet ? 'on' : 'off' }}
+        </button>
+      </div>
+      <span class="pe-hint mono">total de steps: {{ total() }}</span>
+    </div>
+
+    <div class="pe-group">
+      <span class="pe-group__label mono">VOZES</span>
+      <div class="pe-chips">
+        @for (opt of voiceOptions(); track opt.voice) {
+          <button
+            type="button"
+            class="pe-chip"
+            [class.pe-chip--on]="opt.present"
+            (click)="toggleVoice(opt.voice)"
+          >
+            {{ opt.label }}
+          </button>
+        }
+      </div>
+      <span class="pe-hint mono">
+        acentos e sticking: por ora so via preset (ex: "Paradiddle com acentos")
+      </span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,94 @@
+@if (overlay.isOpen()) {
+  <div class="metronome-overlay" (click)="close()">
+    <div class="metronome-panel" role="dialog" aria-modal="true" aria-label="Metrônomo" (click)="$event.stopPropagation()">
+      <button type="button" class="metronome-panel__close" (click)="close()" aria-label="Fechar metrônomo">×</button>
+
+      <div class="metronome-panel__header">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 20 L12 4 L18 20" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+        </svg>
+        <span>Metrônomo</span>
+      </div>
+
+      <div class="bpm-row">
+        <button type="button" class="round-btn" (click)="adjustBpm(-1)" aria-label="Diminuir BPM">–</button>
+        <input
+          class="bpm-value mono"
+          type="number"
+          [min]="30"
+          [max]="300"
+          [value]="metronome.bpm()"
+          (change)="onBpmInput($event)"
+          aria-label="BPM"
+        />
+        <button type="button" class="round-btn" (click)="adjustBpm(1)" aria-label="Aumentar BPM">+</button>
+      </div>
+      <span class="bpm-caption">BPM</span>
+
+      <div class="beat-row" aria-hidden="true">
+        @for (i of beatDots(); track i) {
+          <span
+            class="beat-dot"
+            [class.beat-dot--first]="i === 0"
+            [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
+          ></span>
+        }
+      </div>
+
+      <div class="metronome-row">
+        <label class="compasso-select">
+          <span class="visually-hidden">Compasso</span>
+          <select (change)="onCompassoChange($event)">
+            @for (c of compassoOptions; track c) {
+              <option [value]="c" [selected]="c === metronome.compasso()">{{ c }}/4</option>
+            }
+          </select>
+        </label>
+
+        <button
+          type="button"
+          class="accent-toggle"
+          [class.accent-toggle--on]="metronome.acentuarPrimeiroTempo()"
+          (click)="toggleAcento()"
+          [attr.aria-pressed]="metronome.acentuarPrimeiroTempo()"
+        >
+          <span>acentuar 1º tempo</span>
+          <span class="switch"><span class="switch__knob"></span></span>
+        </button>
+      </div>
+
+      <div class="subdivision-row">
+        @for (s of subdivisions; track s.value) {
+          <button
+            type="button"
+            class="subdivision-btn"
+            [class.subdivision-btn--active]="metronome.subdivisao() === s.value"
+            [title]="s.title"
+            (click)="selectSubdivisao(s.value)"
+          >
+            {{ s.label }}
+          </button>
+        }
+        <button
+          type="button"
+          class="subdivision-btn subdivision-btn--tap"
+          title="Tap tempo - clique no ritmo desejado"
+          (click)="metronome.tapTempo()"
+        >
+          tap
+        </button>
+      </div>
+
+      <button type="button" class="play-toggle" (click)="metronome.alternar()">
+        <app-key-cap label="Espaço" />
+        <span>{{ metronome.tocando() ? 'Tocando — clique pra pausar' : 'Tocar' }}</span>
+      </button>
+
+      <p class="metronome-panel__hint muted">
+        <app-key-cap label="Esc" />
+        <span>fecha o painel · não registra nada, só um utilitário rápido.</span>
+      </p>
+    </div>
+  </div>
+}

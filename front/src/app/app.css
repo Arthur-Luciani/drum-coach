@@ -1,0 +1,110 @@
+.shell-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.75rem 1.5rem 1.25rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (min-width: 720px) {
+  .shell-header {
+    padding-left: 3.5rem;
+    padding-right: 3.5rem;
+  }
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--color-heading);
+}
+
+.brand-mark {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.brand-word {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+
+.shortcuts-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.shortcuts-hint:hover {
+  color: var(--color-text-secondary);
+  filter: none;
+}
+
+/* Faixa de pilulas numeradas - navegacao principal (ver mockup Woodshed, artboard
+   Main, "Section nav strip"). O numero de cada pilula bate com os atalhos 1-5 do
+   KeyboardShortcutsService (ver app.ts). */
+.nav-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.nav-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 7px;
+  color: var(--color-text-tertiary);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.nav-pill:hover {
+  color: var(--color-text-secondary);
+}
+
+.nav-pill__num {
+  font-size: 0.65rem;
+  font-weight: 700;
+  opacity: 0.6;
+}
+
+.nav-pill--active {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.nav-pill--active:hover {
+  color: var(--color-accent-contrast);
+}
+
+.nav-pill--active .nav-pill__num {
+  opacity: 0.75;
+}

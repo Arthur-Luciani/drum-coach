@@ -1,0 +1,44 @@
+<header class="shell-header">
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 20 L12 4 L18 20" />
+        <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      </svg>
+      <span class="brand-word">WOODSHED</span>
+    </div>
+    <button type="button" class="shortcuts-hint" (click)="shortcutsOverlay.open()" title="Ver todos os atalhos de teclado">
+      <app-key-cap label="?" />
+      <span>atalhos</span>
+    </button>
+  </div>
+
+  <nav class="nav-strip">
+    <a class="nav-pill" routerLink="/dashboard" routerLinkActive="nav-pill--active" [routerLinkActiveOptions]="{ exact: true }">
+      <span class="nav-pill__num mono">1</span>
+      <span>Dashboard</span>
+    </a>
+    <a class="nav-pill" routerLink="/executions" routerLinkActive="nav-pill--active">
+      <span class="nav-pill__num mono">2</span>
+      <span>Execuções</span>
+    </a>
+    <a class="nav-pill" routerLink="/lessons" routerLinkActive="nav-pill--active">
+      <span class="nav-pill__num mono">3</span>
+      <span>Aulas</span>
+    </a>
+    <a class="nav-pill" routerLink="/repertoire" routerLinkActive="nav-pill--active">
+      <span class="nav-pill__num mono">4</span>
+      <span>Repertório</span>
+    </a>
+    <a class="nav-pill" routerLink="/goals" routerLinkActive="nav-pill--active">
+      <span class="nav-pill__num mono">5</span>
+      <span>Metas</span>
+    </a>
+  </nav>
+</header>
+
+<router-outlet></router-outlet>
+
+<app-shortcuts-cheatsheet />
+<app-metronome-overlay />
+<app-training-picker />

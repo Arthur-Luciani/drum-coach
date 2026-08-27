@@ -1,0 +1,312 @@
+@if (trainingId() != null && loading()) {
+  <main class="page session-stub">
+    <span class="session-stub__eyebrow mono">MODO SESSÃO</span>
+    <p class="muted">Carregando...</p>
+  </main>
+} @else if (trainingId() != null && problemMessage(); as msg) {
+  <main class="page session-stub">
+    <span class="session-stub__eyebrow mono">MODO SESSÃO</span>
+    <h1>{{ trainingName() ?? ('#' + trainingId()) }}</h1>
+    <p class="session-stub__note">{{ msg }}</p>
+    <p class="session-stub__hint">
+      <app-key-cap label="Esc" />
+      <span>voltar ao início</span>
+    </p>
+  </main>
+} @else if (sessionState.estado() === 'reviewing') {
+  <main class="session-review">
+    <div class="session-review__card">
+      <div class="session-review__header">
+        <span class="session-review__eyebrow mono">SESSÃO ENCERRADA</span>
+        <h1>{{ trainingId() != null ? (trainingName() ?? ('#' + trainingId())) : 'Sessão livre' }}</h1>
+      </div>
+
+      <div class="session-review__stats">
+        <div class="review-stat">
+          <span class="review-stat__label">DURAÇÃO</span>
+          <span class="review-stat__value mono">{{ totalSegundosLabel() }}</span>
+        </div>
+        @if (trainingId() != null) {
+          <div class="review-stat">
+            <span class="review-stat__label">EXERCÍCIOS</span>
+            <span class="review-stat__value mono">{{ sessionState.logs().length }} de {{ totalExercicios() }}</span>
+          </div>
+        }
+      </div>
+
+      @if (trainingId() != null) {
+        <div class="session-review__exercises">
+          @for (log of sessionState.logs(); track $index) {
+            <div class="review-exercise-row">
+              <span class="review-exercise-row__name">{{ exercicioNome(log.exerciseId) }}</span>
+              <span class="review-exercise-row__stats">
+                @if (log.achievedBpm != null) {
+                  <span class="mono review-exercise-row__bpm">{{ log.achievedBpm }} bpm</span>
+                }
+                @if (log.actualDurationSeconds != null) {
+                  <span class="mono review-exercise-row__duration">{{ formatClock(log.actualDurationSeconds) }}</span>
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="session-review__field">
+        <span class="session-review__field-label">como você se sentiu?</span>
+        <div class="feeling-pills">
+          @for (opcao of sensacaoOpcoes; track opcao) {
+            <button
+              type="button"
+              class="feeling-pill"
+              [class.feeling-pill--active]="sessionState.feeling() === opcao"
+              (click)="sessionState.feeling.set(opcao)"
+            >
+              {{ opcao }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="session-review__field">
+        <label class="session-review__field-label" for="reviewNotes">notas gerais (opcional)</label>
+        <textarea
+          id="reviewNotes"
+          rows="3"
+          placeholder="alguma observação sobre esta sessão..."
+          [value]="sessionState.generalNotes() ?? ''"
+          (input)="sessionState.generalNotes.set($any($event.target).value)"
+        ></textarea>
+      </div>
+
+      @if (saveError(); as err) {
+        <p class="error">{{ err }}</p>
+      }
+
+      <button type="button" class="session-review__save" [disabled]="salvando()" (click)="salvar()">
+        <span>{{ salvando() ? 'Salvando...' : 'Salvar sessão' }}</span>
+        <app-key-cap label="Enter" />
+      </button>
+
+      <p class="session-review__escape-hint muted">
+        <app-key-cap label="Esc" />
+        <span>voltar sem salvar</span>
+      </p>
+    </div>
+  </main>
+} @else if (trainingId() != null) {
+  <main class="session-run">
+    <div class="session-run__top">
+      <div class="session-run__top-left">
+        <span class="session-run__training">{{ trainingName() ?? ('#' + trainingId()) }}</span>
+
+        <div class="session-run__progress-dots" aria-hidden="true">
+          @for (ex of sessionState.exercicios(); track ex.id; let i = $index) {
+            <span
+              class="progress-dot"
+              [class.progress-dot--done]="i < sessionState.indiceAtual()"
+              [class.progress-dot--current]="i === sessionState.indiceAtual()"
+            ></span>
+          }
+        </div>
+
+        <span class="session-run__count mono">
+          exercício {{ sessionState.indiceAtual() + 1 }} de {{ totalExercicios() }}
+        </span>
+      </div>
+
+      <button type="button" class="session-run__end" (click)="sair()">
+        <span>encerrar</span>
+        <app-key-cap label="Esc" />
+      </button>
+    </div>
+
+    <div class="session-run__center">
+      @if (sessionState.estado() === 'countIn') {
+        <span class="session-run__eyebrow mono">
+          PREPARANDO — {{ (exercicioAtual()?.name ?? '').toUpperCase() }}
+        </span>
+
+        <div class="beat-row" aria-hidden="true">
+          @for (i of beatDots; track i) {
+            <span
+              class="beat-dot"
+              [class.beat-dot--first]="i === 0"
+              [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
+            ></span>
+          }
+        </div>
+
+        <p class="session-run__prep-hint muted">
+          um compasso pra se posicionar — o metrônomo já está no andamento certo
+        </p>
+      } @else if (
+        (sessionState.estado() === 'running' || sessionState.estado() === 'timeUp') && exercicioAtual();
+        as exercicio
+      ) {
+        <div class="session-run__heading">
+          <h1>{{ exercicio.name }}</h1>
+          @if (exercicio.howToExecute) {
+            <p class="session-run__description">{{ exercicio.howToExecute }}</p>
+          }
+        </div>
+
+        @if (exercicioTemPattern() && exercicio.pattern) {
+          <app-drum-sheet
+            style="display: block; width: 100%; max-width: 640px"
+            [pattern]="exercicio.pattern"
+            [playheadPos]="playheadPos()"
+            [highlightStep]="playheadStep()"
+          />
+        } @else if (exercicio.kind === 'TRANSCRICAO' && exercicio.passages.length) {
+          <ul class="mono" style="list-style: none; margin: 0; padding: 0; font-size: 0.8rem">
+            @for (trecho of exercicio.passages; track trecho.id) {
+              <li>
+                <span>{{ formatClock(trecho.fromSeconds)
+                  }}@if (trecho.toSeconds != null) {–{{ formatClock(trecho.toSeconds) }}}</span>
+                @if (trecho.label) {
+                  <span class="muted" style="margin-left: 0.6rem">{{ trecho.label }}</span>
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        @if (sessionState.estado() === 'timeUp') {
+          <div class="time-up-badge">
+            <span class="time-up-badge__dot" aria-hidden="true"></span>
+            <span class="mono">{{ formatClock(exercicio.targetDurationSeconds ?? 0) }} — tempo previsto cumprido</span>
+          </div>
+        }
+
+        <div class="session-run__timer-row">
+          <span class="mono session-run__timer-elapsed">{{ formatClock(sessionState.segundosDecorridos()) }}</span>
+          @if (exercicio.targetDurationSeconds; as alvo) {
+            <span class="mono session-run__timer-target">/ {{ formatClock(alvo) }} previstos</span>
+          }
+        </div>
+
+        <div class="session-run__bpm-row">
+          <span class="mono session-run__bpm-value">{{ metronome.bpm() }}</span>
+          <div class="session-run__bpm-caption">
+            <span class="session-run__bpm-label">BPM</span>
+            @if (exercicio.targetBpm; as alvo) {
+              <span class="mono session-run__bpm-target">alvo {{ alvo }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="beat-row" aria-hidden="true">
+          @for (i of beatDots; track i) {
+            <span
+              class="beat-dot"
+              [class.beat-dot--first]="i === 0"
+              [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
+            ></span>
+          }
+        </div>
+      }
+    </div>
+
+    @if (
+      sessionState.estado() === 'countIn' || sessionState.estado() === 'running' || sessionState.estado() === 'timeUp'
+    ) {
+      <div class="session-run__hints">
+        <div class="session-run__hint">
+          <app-key-cap label="Espaço" />
+          <span>metrônomo</span>
+        </div>
+        <div class="session-run__hint">
+          <app-key-cap label="← →" />
+          <span>exercício</span>
+        </div>
+        <div class="session-run__hint">
+          <app-key-cap label="↑ ↓" />
+          <span>bpm</span>
+        </div>
+        <div class="session-run__hint">
+          <app-key-cap label="Enter" />
+          <span>confirmar</span>
+        </div>
+        <div class="session-run__hint">
+          <app-key-cap label="Esc" />
+          <span>encerrar</span>
+        </div>
+      </div>
+    } @else {
+      <div class="session-run__hints">
+        <div class="session-run__hint">
+          <app-key-cap label="Esc" />
+          <span>voltar ao início</span>
+        </div>
+      </div>
+    }
+  </main>
+} @else {
+  <main class="session-run session-free">
+    <div class="session-run__top">
+      <div class="session-free__top-left">
+        <span class="session-free__dot" aria-hidden="true"></span>
+        <span class="session-free__label">Sessão livre — sem treino vinculado</span>
+      </div>
+
+      <button type="button" class="session-run__end" (click)="sair()">
+        <span>encerrar</span>
+        <app-key-cap label="Esc" />
+      </button>
+    </div>
+
+    <div class="session-run__center">
+      <div class="session-free__timer">
+        <span class="mono session-free__timer-value">{{ formatClock(sessionState.segundosDecorridos()) }}</span>
+        <span class="session-free__timer-label mono">TEMPO DE PRÁTICA</span>
+      </div>
+
+      <div class="session-free__bpm-row">
+        <span class="mono session-free__bpm-value">{{ metronome.bpm() }}</span>
+        <span class="session-free__bpm-caption">BPM · metrônomo</span>
+      </div>
+
+      <div class="beat-row" aria-hidden="true">
+        @for (i of beatDots; track i) {
+          <span
+            class="beat-dot"
+            [class.beat-dot--first]="i === 0"
+            [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
+          ></span>
+        }
+      </div>
+
+      <div class="session-free__note">
+        <span class="session-free__note-label mono">NOTA RÁPIDA</span>
+        <textarea
+          #quickNote
+          class="session-free__note-input"
+          rows="2"
+          placeholder="alguma observação rápida sobre esta sessão..."
+          [value]="sessionState.generalNotes() ?? ''"
+          (input)="sessionState.generalNotes.set($any($event.target).value)"
+        ></textarea>
+      </div>
+    </div>
+
+    <div class="session-run__hints">
+      <div class="session-run__hint">
+        <app-key-cap label="Espaço" />
+        <span>metrônomo</span>
+      </div>
+      <div class="session-run__hint">
+        <app-key-cap label="↑ ↓" />
+        <span>bpm</span>
+      </div>
+      <div class="session-run__hint">
+        <app-key-cap label="Enter" />
+        <span>nova nota</span>
+      </div>
+      <div class="session-run__hint">
+        <app-key-cap label="Esc" />
+        <span>encerrar</span>
+      </div>
+    </div>
+  </main>
+}

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>dev.drumcoach</groupId>
+	<artifactId>drum-coach-mcp</artifactId>
+	<version>0.1.0-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<name>drum-coach-mcp</name>
+	<description>Proxy MCP (stdio) do drum-coach - traduz tool calls em chamadas HTTP para a API REST do back (ver ADR-0007)</description>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- Deliberadamente compilado para o bytecode 21 (nao 25, como o back): este
+		     modulo nao usa nenhuma feature de linguagem nova, e compilar com release=21
+		     permite que o jar final execute com o `java` mais antigo que ja estiver no
+		     PATH do usuario (ex.: JDK 23 nesta maquina), sem precisar do workaround de
+		     caminho completo do JDK 25 documentado no README do `back`. -->
+		<maven.compiler.release>21</maven.compiler.release>
+		<mcp-sdk.version>2.0.1</mcp-sdk.version>
+		<junit.version>5.11.4</junit.version>
+	</properties>
+
+	<dependencies>
+		<!-- SDK MCP Java (server sincrono + transporte stdio). Aggregator artifact -
+		     traz mcp-core (server/client, McpSchema) e mcp-json-jackson3 (implementacao
+		     de McpJsonMapper sobre Jackson 3 - reaproveitada abaixo para montar/parsear
+		     o JSON das chamadas HTTP ao back, em vez de somar outra lib de JSON). -->
+		<dependency>
+			<groupId>io.modelcontextprotocol.sdk</groupId>
+			<artifactId>mcp</artifactId>
+			<version>${mcp-sdk.version}</version>
+		</dependency>
+
+		<!-- Cliente HTTP: java.net.http.HttpClient (JDK), sem dependencia extra. -->
+
+		<!-- Test: JUnit 5 puro (sem Spring). O teste de integracao stdio usa o proprio
+		     McpClient/StdioClientTransport do SDK para falar o protocolo MCP de verdade
+		     com o processo do proxy rodando como subprocesso. -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<finalName>drum-coach-mcp</finalName>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.14.1</version>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.6</version>
+				<!-- Roda so os testes *Test.java (padrao) na fase `test` - McpProxyStdioTest
+				     nao precisa do `back` no ar. O teste de integracao contra o `back` de
+				     verdade (BackendIT) e nomeado de proposito fora do padrao *Test.java para
+				     NAO rodar automaticamente em `mvn clean package` (o `back` normalmente nao
+				     esta de pe durante o build) - rode-o manualmente com
+				     `mvn test -Dtest=BackendIT` depois de subir o `back`. -->
+			</plugin>
+
+			<!-- Empacota um jar unico e autocontido (todas as dependencias dentro), com
+			     Main-Class no manifest - e assim que o Claude Desktop vai rodar este
+			     processo: `java -jar drum-coach-mcp.jar`. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.6.1</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<!-- Ninguem depende deste jar via Maven (ele so e rodado com
+							     `java -jar`) - nao precisa do dependency-reduced-pom.xml
+							     que o shade gera por padrao na raiz do modulo. -->
+							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>dev.drumcoach.mcp.McpProxyApplication</mainClass>
+								</transformer>
+								<!-- Essencial: o SDK MCP resolve McpJsonMapper via
+								     META-INF/services/io.modelcontextprotocol.json.McpJsonMapperSupplier
+								     (ServiceLoader). Sem este transformer, o shade so mantem UM dos
+								     arquivos de servico em caso de colisao de nome entre jars, em vez
+								     de concatenar - quebraria a resolucao do mapper Jackson. -->
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+							</transformers>
+							<filters>
+								<filter>
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>META-INF/*.SF</exclude>
+										<exclude>META-INF/*.DSA</exclude>
+										<exclude>META-INF/*.RSA</exclude>
+									</excludes>
+								</filter>
+							</filters>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

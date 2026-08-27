@@ -1,0 +1,28 @@
+@if (overlay.isOpen()) {
+  <div class="shortcuts-overlay" (click)="close()">
+    <div class="shortcuts-panel" role="dialog" aria-modal="true" aria-label="Atalhos de teclado" (click)="$event.stopPropagation()">
+      <div class="shortcuts-panel__header">
+        <h2>Atalhos de teclado</h2>
+        <button type="button" class="secondary" (click)="close()">Fechar</button>
+      </div>
+
+      @for (section of sections; track section.title) {
+        <section class="shortcuts-section">
+          <h3>{{ section.title }}</h3>
+          <ul class="shortcuts-list">
+            @for (item of section.items; track $index) {
+              <li class="shortcuts-list__item">
+                <app-key-cap [label]="item.key" />
+                <span>{{ item.description }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      <p class="shortcuts-panel__hint muted">
+        Pressione <app-key-cap label="?" /> ou <app-key-cap label="Esc" /> pra fechar.
+      </p>
+    </div>
+  </div>
+}

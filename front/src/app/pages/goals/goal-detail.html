@@ -1,0 +1,229 @@
+<main class="page page--wide">
+  <div class="breadcrumb">
+    <a routerLink="/goals">Metas</a>
+    <span>/</span>
+    @if (detail(); as d) {
+      <span class="breadcrumb__current">{{ d.goal.title }}</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="muted">Carregando...</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+  @if (notFound()) {
+    <p class="error">Meta não encontrada.</p>
+  }
+
+  @if (detail(); as d) {
+    <div>
+      <div style="display: flex; align-items: center; gap: 0.6rem;">
+        @if (d.goal.status === 'ACHIEVED' || d.goal.status === 'ABANDONED') {
+          <!-- metas concluidas/abandonadas nao mostram o icone de foco -->
+        } @else if (d.goal.inFocus) {
+          <span class="star-btn star-btn--filled star-btn--sm" title="Meta em foco" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--color-accent-contrast)" stroke="none">
+              <path d="M12 2 L14.9 8.6 L22 9.4 L16.7 14.2 L18.2 21.2 L12 17.6 L5.8 21.2 L7.3 14.2 L2 9.4 L9.1 8.6 Z" />
+            </svg>
+          </span>
+        } @else {
+          <button type="button" class="icon-btn star-btn star-btn--sm" (click)="focusGoal()" title="Marcar como foco no Dashboard">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 2 L14.9 8.6 L22 9.4 L16.7 14.2 L18.2 21.2 L12 17.6 L5.8 21.2 L7.3 14.2 L2 9.4 L9.1 8.6 Z" />
+            </svg>
+          </button>
+        }
+        <h1 style="margin: 0;">{{ d.goal.title }}</h1>
+        <app-badge [variant]="d.goal.status" [label]="goalStatusLabel(d.goal.status)" />
+      </div>
+      <p class="muted" style="margin: 0.4rem 0 0;">
+        @if (d.goal.targetMetric) {
+          alvo: {{ d.goal.targetMetric }}
+        }
+        @if (d.goal.targetMetric && d.goal.targetDate) {
+          ·
+        }
+        @if (d.goal.targetDate) {
+          até {{ formatDateBr(d.goal.targetDate) }}
+        }
+        @if (!d.goal.targetMetric && !d.goal.targetDate) {
+          sem alvo/prazo definidos
+        }
+      </p>
+      @if (d.goal.description) {
+        <p>{{ d.goal.description }}</p>
+      }
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.875rem; margin-top: 1.25rem;">
+      @for (training of d.trainings; track training.trainingId) {
+        <div class="row-card row-card--stack" [class.row-card--strong]="expandedTrainingId() === training.trainingId">
+          <div class="section-header" style="cursor: pointer;" (click)="toggleExpand(training.trainingId)">
+            <strong>{{ training.name }}</strong>
+            <div class="row-card__side">
+              @if (training.targetRepetitions) {
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;">
+                  <span class="mono" style="font-size: 0.75rem;" [class.muted]="training.completedCount < training.targetRepetitions">
+                    pelo menos {{ training.targetRepetitions }}x — feito {{ training.completedCount }}x
+                  </span>
+                  <app-progress-bar [value]="training.completedCount" [max]="training.targetRepetitions" />
+                </div>
+              } @else {
+                <span class="muted mono" style="font-size: 0.75rem;">sem meta de repetição</span>
+              }
+              <svg class="chevron" [class.chevron--open]="expandedTrainingId() === training.trainingId" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9 L12 15 L18 9" /></svg>
+            </div>
+          </div>
+
+          @if (expandedTrainingId() === training.trainingId) {
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              @if (exercisesLoading()) {
+                <p class="muted">Carregando exercícios...</p>
+              }
+              @for (exercise of exercisesFor(training.trainingId); track exercise.id) {
+                <div class="exercise-row">
+                  <div>
+                    <span>{{ exercise.name }}</span>
+                    <span class="badge" style="margin-left: 0.5rem;">
+                      {{ exercise.kind === 'TOCA_JUNTO' ? 'toca junto' : 'transcrição' }}
+                    </span>
+                    @if (exercise.howToExecute) {
+                      <div class="muted" style="font-size: 0.75rem;">{{ exercise.howToExecute }}</div>
+                    }
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+                    <span class="mono" style="color: var(--color-accent); font-size: 0.8rem; white-space: nowrap;">
+                      @if (exercise.targetBpm) {
+                        alvo {{ exercise.targetBpm }} bpm
+                      }
+                      @if (exercise.targetBpm && formatDurationLabel(exercise.targetDurationSeconds)) {
+                        ·
+                      }
+                      {{ formatDurationLabel(exercise.targetDurationSeconds) }}
+                    </span>
+                    @if (exercise.videoUrl) {
+                      <a [href]="exercise.videoUrl" target="_blank" rel="noopener" style="font-size: 0.78rem;">vídeo</a>
+                    }
+                    <button type="button" class="link" (click)="toggleEditExercise(exercise.id)">
+                      {{ editingExerciseId() === exercise.id ? 'fechar' : 'editar' }}
+                    </button>
+                  </div>
+                </div>
+                @if (editingExerciseId() === exercise.id) {
+                  <app-exercise-editor
+                    [exercise]="exercise"
+                    (saved)="onExerciseSaved(training.trainingId)"
+                    (closed)="toggleEditExercise(exercise.id)"
+                  />
+                }
+              } @empty {
+                <p class="empty">Nenhum exercício cadastrado ainda.</p>
+              }
+
+              <h3 style="margin: 0.5rem 0 0; font-size: 0.9rem;">Novo exercício para "{{ training.name }}"</h3>
+              <form
+                class="stacked"
+                [style.max-width.px]="newExerciseKind === 'TOCA_JUNTO' ? 720 : 480"
+                (ngSubmit)="createExercise(training.trainingId)"
+              >
+                <div class="field">
+                  <label>tipo de exercício *</label>
+                  <div class="segmented">
+                    <button
+                      type="button"
+                      [class.segmented__option--active]="newExerciseKind === 'TOCA_JUNTO'"
+                      (click)="newExerciseKind = 'TOCA_JUNTO'"
+                    >
+                      Toca junto
+                    </button>
+                    <button
+                      type="button"
+                      [class.segmented__option--active]="newExerciseKind === 'TRANSCRICAO'"
+                      (click)="newExerciseKind = 'TRANSCRICAO'"
+                    >
+                      Transcrição
+                    </button>
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field">
+                    <label>nome *</label>
+                    <input type="text" name="exerciseName" required [(ngModel)]="newExerciseName" />
+                  </div>
+                  <div class="field">
+                    <label>tipo *</label>
+                    <input type="text" name="exerciseType" placeholder="ex: rudimento, coordenação" required [(ngModel)]="newExerciseType" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label>
+                    {{ newExerciseKind === 'TRANSCRICAO' ? 'notas da transcrição' : 'nota livre' }}
+                    (opcional)
+                  </label>
+                  <textarea name="exerciseHowTo" [(ngModel)]="newExerciseHowTo"></textarea>
+                </div>
+                @if (newExerciseKind === 'TOCA_JUNTO') {
+                  <div class="field">
+                    <label>padrão tocável</label>
+                    <app-pattern-editor
+                      [pattern]="newExercisePattern"
+                      (patternChange)="newExercisePattern = $event"
+                    />
+                  </div>
+                }
+                <div class="field-row">
+                  <div class="field">
+                    <label>bpm alvo</label>
+                    <input type="number" min="1" name="exerciseTargetBpm" [(ngModel)]="newExerciseTargetBpm" />
+                  </div>
+                  <div class="field">
+                    <label>duração alvo (segundos)</label>
+                    <input type="number" min="1" name="exerciseTargetDurationSeconds" [(ngModel)]="newExerciseTargetDurationSeconds" />
+                  </div>
+                  <div class="field">
+                    <label>vídeo de referência (url)</label>
+                    <input type="text" name="exerciseVideoUrl" [(ngModel)]="newExerciseVideoUrl" />
+                  </div>
+                </div>
+                <button type="submit" [disabled]="!newExerciseKind">+ exercício</button>
+              </form>
+            </div>
+          }
+        </div>
+      } @empty {
+        <p class="empty">Nenhum treino nesta meta ainda.</p>
+      }
+    </div>
+
+    <div class="panel" style="width: auto; margin-top: 1.25rem;" id="new-training-form">
+      <span class="panel__title">NOVO TREINO</span>
+      <form class="stacked" (ngSubmit)="createTraining()">
+        <div class="field">
+          <label>nome *</label>
+          <input type="text" name="trainingName" required [(ngModel)]="newTrainingName" />
+        </div>
+        <div class="field">
+          <label>descrição</label>
+          <textarea name="trainingDescription" [(ngModel)]="newTrainingDescription"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>duração alvo (min) *</label>
+            <input type="number" min="1" name="trainingDuration" required [(ngModel)]="newTrainingDuration" />
+          </div>
+          <div class="field">
+            <label>meta de repetições (soft, sem prazo)</label>
+            <input type="number" min="1" name="trainingTargetReps" [(ngModel)]="newTrainingTargetReps" />
+          </div>
+        </div>
+        <button type="submit">+ treino</button>
+      </form>
+    </div>
+
+    <div class="claude-hint" style="margin-top: 1.25rem;">
+      <span>precisa ajustar os treinos? peça pro Claude — ele edita direto por aqui</span>
+    </div>
+  }
+</main>

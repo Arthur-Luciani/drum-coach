@@ -1,0 +1,93 @@
+/* Editor de padrao (Woodshed): a pauta em cima, controles estruturais embaixo. */
+.pattern-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.pattern-editor__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.pe-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pe-group__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+
+.pe-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pe-chip {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.pe-chip--on {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.pe-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.pe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pe-field > span {
+  font-size: 0.68rem;
+  color: var(--color-text-tertiary);
+}
+
+.pe-field input,
+.pe-field select {
+  width: 5.5rem;
+  padding: 0.4rem 0.5rem;
+}
+
+.pe-slash {
+  padding-bottom: 0.45rem;
+  color: var(--color-text-faint);
+}
+
+.pe-toggle {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.pe-toggle--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.pe-hint {
+  font-size: 0.68rem;
+  color: var(--color-text-faint);
+}

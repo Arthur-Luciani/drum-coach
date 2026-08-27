@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.1</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>dev.drumcoach</groupId>
+	<artifactId>drum-coach</artifactId>
+	<version>0.1.0-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<name>drum-coach</name>
+	<description>Caderno pessoal de treino de bateria, com coaching via MCP</description>
+
+	<properties>
+		<java.version>25</java.version>
+		<sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
+		<flyway.version>13.4.0</flyway.version>
+		<frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
+		<frontend.dir>${project.basedir}/../front</frontend.dir>
+		<frontend.build.output>${project.build.outputDirectory}/static</frontend.build.output>
+	</properties>
+
+	<dependencies>
+		<!-- Web (presentation.web entry point) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- Persistence (infra) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jdbc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.xerial</groupId>
+			<artifactId>sqlite-jdbc</artifactId>
+			<version>${sqlite-jdbc.version}</version>
+		</dependency>
+		<!-- Traz o FlywayAutoConfiguration (Boot 4 separou a autoconfig de Flyway neste
+		     modulo dedicado, fora de spring-boot-autoconfigure). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+			<version>${flyway.version}</version>
+		</dependency>
+
+		<!-- Test -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<finalName>drum-coach</finalName>
+		<plugins>
+			<!-- IMPORTANTE (validado empiricamente na Fase 0): um jar "gordo" repackaged
+			     pelo spring-boot-maven-plugin NAO funciona com `java -cp app.jar <FQCN>`,
+			     porque as classes da aplicacao ficam em BOOT-INF/classes/ e as dependencias
+			     em BOOT-INF/lib/*.jar (jars aninhados), que uma classpath simples do JVM nao
+			     enxerga - so o loader proprio do Boot (acionado por `java -jar`, que so
+			     permite UM Start-Class) sabe lidar com isso. Como este projeto precisa de
+			     DOIS entry points via `-cp`, nao usamos o jar repackaged para rodar a
+			     aplicacao: usamos maven-dependency-plugin para copiar as dependencias de
+			     runtime para target/lib/, e o jar "fino" normal (so as classes deste
+			     projeto) em target/drum-coach.jar. Rode com:
+			       java -cp "target/drum-coach.jar;target/lib/*" <FQCN>
+			     (";" no Windows, ":" no Linux/Mac). -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-runtime-dependencies</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+							<includeScope>runtime</includeScope>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Tambem gera um jar executavel classico (BOOT-INF, `java -jar`) com
+			     classifier "boot", so por conveniencia (ex.: distribuir so o WebApplication
+			     sem precisar de -cp) - NAO e o mecanismo usado para rodar os dois entry
+			     points; o artefato principal (target/drum-coach.jar) continua sendo o jar
+			     fino de sempre. -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<classifier>boot</classifier>
+					<mainClass>dev.drumcoach.presentation.web.WebApplication</mainClass>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Empacota o build do Angular (frontend/) em target/classes/static ANTES do
+			     spring-boot:repackage, para que o jar final sirva a SPA. -->
+			<plugin>
+				<groupId>com.github.eirslett</groupId>
+				<artifactId>frontend-maven-plugin</artifactId>
+				<version>${frontend-maven-plugin.version}</version>
+				<configuration>
+					<workingDirectory>${frontend.dir}</workingDirectory>
+					<installDirectory>${project.build.directory}/frontend-tools</installDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<id>install-node-and-npm</id>
+						<goals>
+							<goal>install-node-and-npm</goal>
+						</goals>
+						<phase>generate-resources</phase>
+						<configuration>
+							<nodeVersion>v22.14.0</nodeVersion>
+							<npmVersion>11.2.0</npmVersion>
+						</configuration>
+					</execution>
+					<execution>
+						<id>npm-install</id>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<phase>generate-resources</phase>
+						<configuration>
+							<arguments>install</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>npm-build</id>
+						<goals>
+							<goal>npm</goal>
+						</goals>
+						<phase>generate-resources</phase>
+						<configuration>
+							<arguments>run build</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+</project>

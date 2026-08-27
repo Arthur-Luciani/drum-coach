@@ -1,0 +1,66 @@
+<div class="exercise-editor">
+  <div class="exercise-editor__head">
+    <span class="mono exercise-editor__kind">
+      {{ isTocaJunto() ? 'TOCA JUNTO — PADRÃO' : 'TRANSCRIÇÃO' }}
+    </span>
+    <button type="button" class="link" (click)="closed.emit()">fechar</button>
+  </div>
+
+  @if (error(); as e) {
+    <p class="error">{{ e }}</p>
+  }
+
+  @if (isTocaJunto()) {
+    <app-pattern-editor [pattern]="working()" (patternChange)="onPattern($event)" />
+    <button type="button" [disabled]="saving()" (click)="salvarPattern()">
+      {{ saving() ? 'Salvando...' : 'salvar padrão' }}
+    </button>
+  } @else {
+    <div class="field">
+      <label>notas da transcrição</label>
+      <textarea
+        rows="4"
+        name="transcriptionNotes"
+        placeholder="o que você percebe na música, no que prestar atenção..."
+        [(ngModel)]="notes"
+      ></textarea>
+    </div>
+    <button type="button" [disabled]="saving()" (click)="salvarNotas()">
+      {{ saving() ? 'Salvando...' : 'salvar notas' }}
+    </button>
+
+    <div class="exercise-editor__passages">
+      <span class="mono exercise-editor__kind">TRECHOS MARCADOS</span>
+      @for (trecho of passages(); track trecho.id) {
+        <div class="passage-row">
+          <span class="mono">
+            {{ formatClock(trecho.fromSeconds)
+            }}@if (trecho.toSeconds != null) {–{{ formatClock(trecho.toSeconds) }}}
+          </span>
+          @if (trecho.label) {
+            <span class="passage-row__label">{{ trecho.label }}</span>
+          }
+          <button type="button" class="link danger" (click)="removerTrecho(trecho.id)">remover</button>
+        </div>
+      } @empty {
+        <p class="muted" style="font-size: 0.8rem;">Nenhum trecho marcado ainda.</p>
+      }
+
+      <form class="passage-add" (ngSubmit)="adicionarTrecho()">
+        <div class="field">
+          <label>de (s) *</label>
+          <input type="number" min="0" name="from" required [(ngModel)]="newFromSeconds" />
+        </div>
+        <div class="field">
+          <label>até (s)</label>
+          <input type="number" min="0" name="to" [(ngModel)]="newToSeconds" />
+        </div>
+        <div class="field">
+          <label>rótulo</label>
+          <input type="text" name="label" placeholder="ex: virada da ponte" [(ngModel)]="newLabel" />
+        </div>
+        <button type="submit">+ trecho</button>
+      </form>
+    </div>
+  }
+</div>

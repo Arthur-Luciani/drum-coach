@@ -1,0 +1,71 @@
+@if (overlay.isOpen()) {
+  <div class="training-picker-overlay" (click)="close()">
+    <div class="training-picker-panel" role="dialog" aria-modal="true" aria-label="Escolher treino" (click)="$event.stopPropagation()">
+      @if (overlay.goalDetail(); as detail) {
+        <div class="training-picker-panel__header">
+          <span class="training-picker-panel__eyebrow mono">{{ detail.goal.title.toUpperCase() }}</span>
+          <h2>Qual treino hoje?</h2>
+        </div>
+
+        <div class="training-picker-list">
+          @for (item of items(); track $index) {
+            <button
+              type="button"
+              class="training-picker-item"
+              [class.training-picker-item--selected]="$index === cursor()"
+              (click)="confirm($index)"
+              (mouseenter)="setCursor($index)"
+            >
+              <span class="training-picker-item__num mono">{{ $index + 1 }}</span>
+
+              @if (item.kind === 'training') {
+                <div class="training-picker-item__body">
+                  <div class="training-picker-item__row">
+                    <span class="training-picker-item__name">{{ item.name }}</span>
+                    @if (formatDurationMinutesLabel(item.targetDurationMinutes); as duration) {
+                      <span class="training-picker-item__meta">{{ duration }}</span>
+                    }
+                  </div>
+                  @if (item.targetRepetitions) {
+                    <div class="training-picker-item__progress-row">
+                      <app-progress-bar [value]="item.completedCount" [max]="item.targetRepetitions" />
+                      <span class="training-picker-item__count mono">
+                        pelo menos {{ item.targetRepetitions }}x — feito {{ item.completedCount }}x
+                      </span>
+                    </div>
+                  } @else {
+                    <span class="training-picker-item__count mono">feito {{ item.completedCount }}x</span>
+                  }
+                </div>
+              } @else {
+                <div class="training-picker-item__body training-picker-item__body--row">
+                  <span class="training-picker-item__name">Sessão livre — sem treino</span>
+                  <span class="training-picker-item__meta">só cronometrar</span>
+                </div>
+              }
+            </button>
+          }
+        </div>
+
+        <div class="training-picker-hints">
+          <div class="training-picker-hint">
+            <app-key-cap [label]="digitsHintLabel()" />
+            <span>escolher</span>
+          </div>
+          <div class="training-picker-hint">
+            <app-key-cap label="↑ ↓" />
+            <span>navegar</span>
+          </div>
+          <div class="training-picker-hint">
+            <app-key-cap label="Enter" />
+            <span>confirmar</span>
+          </div>
+          <div class="training-picker-hint">
+            <app-key-cap label="Esc" />
+            <span>cancelar</span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}

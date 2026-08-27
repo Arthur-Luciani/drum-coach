@@ -1,0 +1,66 @@
+<main class="page page--wide">
+  <h1>Aulas</h1>
+
+  @if (loading()) {
+    <p class="muted">Carregando...</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <div class="two-col">
+    <div class="two-col__list">
+      @for (lesson of lessons(); track lesson.id) {
+        <article class="row-card row-card--column" [class.row-card--strong]="lesson.generatedTrainingId != null">
+          <div class="section-header">
+            <span class="mono" [class.muted]="lesson.generatedTrainingId == null">{{ formatDateShort(lesson.lessonDate) }}</span>
+            @if (lesson.generatedTrainingId != null) {
+              <span class="muted" style="font-size: 0.75rem;">{{ generatedTrainingLabel(lesson.generatedTrainingId) }}</span>
+            }
+          </div>
+          @if (lesson.teacherNotes) {
+            <p>{{ lesson.teacherNotes }}</p>
+          }
+          @if (lesson.feedback) {
+            <p class="muted"><span>Feedback:</span> {{ lesson.feedback }}</p>
+          }
+          @if (lesson.focusUntilNext) {
+            <p class="muted"><span>Foco até a próxima:</span> {{ lesson.focusUntilNext }}</p>
+          }
+          @if (lesson.suggestedMaterial) {
+            <p class="muted"><span>Material:</span> {{ lesson.suggestedMaterial }}</p>
+          }
+        </article>
+      } @empty {
+        <p class="empty">Nenhuma aula registrada ainda.</p>
+      }
+    </div>
+
+    <aside class="panel">
+      <span class="panel__title">REGISTRAR AULA</span>
+      <form class="stacked" (ngSubmit)="createLesson()">
+        <div class="field">
+          <label for="lessonDate">data *</label>
+          <input id="lessonDate" type="date" name="lessonDate" required [(ngModel)]="lessonDate" />
+        </div>
+        <div class="field">
+          <label for="teacherNotes">o que foi passado</label>
+          <textarea id="teacherNotes" name="teacherNotes" placeholder="descreva a aula..." [(ngModel)]="teacherNotes"></textarea>
+        </div>
+        <div class="field">
+          <label for="feedback">feedback do professor</label>
+          <textarea id="feedback" name="feedback" [(ngModel)]="feedback"></textarea>
+        </div>
+        <div class="field">
+          <label for="focusUntilNext">foco até a próxima (opcional)</label>
+          <textarea id="focusUntilNext" name="focusUntilNext" [(ngModel)]="focusUntilNext"></textarea>
+        </div>
+        <div class="field">
+          <label for="suggestedMaterial">material sugerido</label>
+          <input id="suggestedMaterial" type="text" name="suggestedMaterial" [(ngModel)]="suggestedMaterial" />
+        </div>
+        <button type="submit">Salvar aula</button>
+      </form>
+    </aside>
+  </div>
+</main>

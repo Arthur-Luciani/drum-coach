@@ -1,0 +1,540 @@
+/* Estados sem sessão rodando (carregando, treino vazio/erro) - mesmo layout centrado
+   simples do stub original da Fase 3d. Sessão livre tem UI própria (`.session-free`
+   abaixo), não é mais um destes stubs desde a Fase 3e-3. */
+.session-stub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.875rem;
+  min-height: 60vh;
+  text-align: center;
+}
+
+.session-stub__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--color-accent);
+}
+
+.session-stub h1 {
+  margin: 0;
+}
+
+.session-stub__note {
+  max-width: 480px;
+  color: var(--color-text-tertiary);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.session-stub__hint {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+/* Modo Sessão de verdade (count-in / exercício rodando / fim provisório) - tela
+   imersiva ocupando a altura disponível, sem a largura limitada de `.page`. */
+.session-run {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 130px);
+  padding: 1.25rem 2rem 1.75rem;
+  gap: 1.5rem;
+}
+
+.session-run__top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.session-run__top-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.session-run__training {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+.session-run__progress-dots {
+  display: flex;
+  flex-direction: row;
+  gap: 0.4rem;
+}
+
+.progress-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+
+.progress-dot--done {
+  background: var(--color-accent2);
+}
+
+.progress-dot--current {
+  background: var(--color-accent);
+}
+
+.session-run__count {
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
+.session-run__end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.session-run__end:hover {
+  color: var(--color-text);
+}
+
+.session-run__center {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.75rem;
+  text-align: center;
+}
+
+.session-run__eyebrow {
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--color-text-tertiary);
+}
+
+.session-run__prep-hint {
+  font-size: 0.8rem;
+  max-width: 420px;
+}
+
+.session-run__heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-run__heading h1 {
+  margin: 0;
+  font-size: 2.1rem;
+}
+
+.session-run__description {
+  margin: 0;
+  max-width: 480px;
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+}
+
+.session-run__timer-row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.session-run__timer-elapsed {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.session-run__timer-target {
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
+.session-run__bpm-row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.session-run__bpm-value {
+  font-size: 7.5rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--color-heading);
+}
+
+.session-run__bpm-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.session-run__bpm-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+}
+
+.session-run__bpm-target {
+  font-size: 0.8rem;
+  color: var(--color-accent);
+}
+
+.beat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 1.1rem;
+}
+
+.beat-dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  transition: 0.08s ease;
+}
+
+.beat-dot--first {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 5px;
+}
+
+.beat-dot--active {
+  background: var(--color-accent);
+  transform: scale(1.15);
+}
+
+.session-run__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.session-run__done h1 {
+  margin: 0;
+}
+
+.session-run__note {
+  max-width: 420px;
+  font-size: 0.875rem;
+}
+
+.session-run__hints {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.session-run__hint {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Aviso de "tempo previsto cumprido" (Fase 3e-2) - badge discreto, nao interrompe a
+   tela de exercicio rodando (timer/metronomo continuam identicos ao redor dele). */
+.time-up-badge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 1.05rem;
+  background: oklch(0.78 0.14 70 / 0.14);
+  border: 1px solid oklch(0.78 0.14 70 / 0.5);
+  border-radius: 20px;
+}
+
+.time-up-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.time-up-badge span.mono {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: oklch(0.90 0.08 70);
+}
+
+/* Sessao livre (Fase 3e-3) - reusa a base de layout de `.session-run` (barra superior,
+   centro flexivel, dicas de teclado no rodape), so troca o conteudo do centro: sem
+   nome de treino/progresso de exercicios (nao ha), cronometro em destaque, BPM
+   secundario, nota rapida sempre visivel (ver artboard `SessionModeFree` do mockup). */
+.session-free__top-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.session-free__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  flex-shrink: 0;
+}
+
+.session-free__label {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+}
+
+.session-free__timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.session-free__timer-value {
+  font-size: 5.5rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--color-heading);
+}
+
+.session-free__timer-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+}
+
+.session-free__bpm-row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+.session-free__bpm-value {
+  font-size: 3rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+.session-free__bpm-caption {
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
+.session-free__note {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.session-free__note-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--color-text-faint);
+}
+
+.session-free__note-input {
+  width: 100%;
+  resize: vertical;
+}
+
+/* Revisao pos-sessao (Fase 3e-2) - tela centrada de verdade, layout proprio (nao reusa
+   `.session-run`, a composicao e bem diferente: card unico, sem barra superior). */
+.session-review {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 130px);
+  padding: 2rem;
+}
+
+.session-review__card {
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.session-review__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.session-review__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--color-accent);
+}
+
+.session-review__header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.session-review__stats {
+  display: flex;
+  flex-direction: row;
+  gap: 0.875rem;
+}
+
+.review-stat {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.9rem 1.05rem;
+}
+
+.review-stat__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+.review-stat__value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.session-review__exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.9rem 1.05rem;
+}
+
+.review-exercise-row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.review-exercise-row__name {
+  color: var(--color-text);
+}
+
+.review-exercise-row__stats {
+  display: flex;
+  flex-direction: row;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.review-exercise-row__bpm {
+  color: var(--color-accent);
+}
+
+.review-exercise-row__duration {
+  color: var(--color-text-faint);
+}
+
+.session-review__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.session-review__field-label {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+.session-review__field textarea {
+  width: 100%;
+}
+
+.feeling-pills {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.feeling-pill {
+  flex-grow: 1;
+  text-align: center;
+  padding: 0.6rem 0;
+  border-radius: 9px;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+
+.feeling-pill--active {
+  border: 2px solid var(--color-accent);
+  background: oklch(0.78 0.14 70 / 0.14);
+  color: oklch(0.90 0.05 70);
+  font-weight: 600;
+}
+
+.session-review__save {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.session-review__escape-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+}

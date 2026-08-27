@@ -1,0 +1,20 @@
+# Maven (back/ e mcp/)
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Angular / Node (front/)
+front/node_modules/
+front/dist/
+front/.angular/
+
+# Logs
+*.log
+
+# Banco de dados local (nunca deve ir para o repo - fica em %USERPROFILE%\.drum-coach)
+*.db
+*.db-shm
+*.db-wal

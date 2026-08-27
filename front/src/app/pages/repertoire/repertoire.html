@@ -1,0 +1,129 @@
+<main class="page page--wide">
+  <h1>Repertório</h1>
+
+  @if (loading()) {
+    <p class="muted">Carregando...</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <div class="two-col">
+    <div class="two-col__list">
+      @for (item of items(); track item.id) {
+        <div class="row-card" [class.row-card--strong]="editingId() === item.id">
+          <div class="row-card__main">
+            <span style="font-weight: 600;">{{ item.songTitle }}</span>
+            <span class="muted" style="font-size: 0.78rem;">
+              {{ item.artist ?? 'artista não informado' }}
+              @if (item.links.length > 0) {
+                · {{ item.links.length }} link{{ item.links.length > 1 ? 's' : '' }}
+              }
+            </span>
+          </div>
+          <div class="row-card__side">
+            <span class="mono" [class.muted]="!item.currentBpm">{{ item.currentBpm ?? '—' }} / {{ item.targetBpm ?? '—' }} bpm</span>
+            <app-badge [variant]="item.status" [label]="repertoireStatusLabel(item.status)" />
+            @if (editingId() === item.id) {
+              <button type="button" class="icon-btn" (click)="cancelEdit()" aria-label="Fechar edição">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15 L12 9 L6 15" /></svg>
+              </button>
+            } @else {
+              <button type="button" class="icon-btn" (click)="startEdit(item)" aria-label="Editar música">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9 L12 15 L18 9" /></svg>
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (editingId() === item.id) {
+          <div class="panel" style="width: auto;">
+            <span class="panel__title">EDITAR "{{ item.songTitle }}"</span>
+            <div class="field-row">
+              <div class="field">
+                <label>status</label>
+                <select name="editStatus" [(ngModel)]="editStatus">
+                  <option value="NOT_STARTED">não iniciada</option>
+                  <option value="LEARNING">aprendendo</option>
+                  <option value="MASTERED">dominada</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>bpm atual</label>
+                <input type="number" min="1" name="editCurrentBpm" [(ngModel)]="editCurrentBpm" />
+              </div>
+            </div>
+            <div class="field">
+              <label>notas</label>
+              <textarea name="editNotes" [(ngModel)]="editNotes"></textarea>
+            </div>
+            @if (item.links.length > 0) {
+              <div class="link-list">
+                @for (link of item.links; track link.id) {
+                  <a [href]="link.url" target="_blank" rel="noopener">{{ link.label ?? link.url }}</a>
+                }
+              </div>
+            }
+            <div class="field-row">
+              <div class="field">
+                <label>novo link - url</label>
+                <input type="text" name="editNewLinkUrl" [(ngModel)]="editNewLinkUrl" />
+              </div>
+              <div class="field">
+                <label>novo link - rótulo</label>
+                <input type="text" name="editNewLinkLabel" [(ngModel)]="editNewLinkLabel" />
+              </div>
+            </div>
+            <button type="button" (click)="saveEdit(item)">Salvar</button>
+          </div>
+        }
+      } @empty {
+        <p class="empty">Nenhum item de repertório cadastrado ainda.</p>
+      }
+    </div>
+
+    <aside class="panel">
+      <span class="panel__title">ADICIONAR MÚSICA</span>
+      <form class="stacked" (ngSubmit)="createItem()">
+        <div class="field">
+          <label for="songTitle">título *</label>
+          <input id="songTitle" type="text" name="songTitle" required [(ngModel)]="newSongTitle" />
+        </div>
+        <div class="field">
+          <label for="artist">artista</label>
+          <input id="artist" type="text" name="artist" [(ngModel)]="newArtist" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="targetBpm">bpm alvo</label>
+            <input id="targetBpm" type="number" min="1" name="targetBpm" [(ngModel)]="newTargetBpm" />
+          </div>
+          <div class="field">
+            <label for="currentBpm">bpm atual</label>
+            <input id="currentBpm" type="number" min="1" name="currentBpm" [(ngModel)]="newCurrentBpm" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="notes">notas</label>
+          <textarea id="notes" name="notes" [(ngModel)]="newNotes"></textarea>
+        </div>
+
+        <div class="field">
+          <label>link de referência</label>
+          @for (link of newLinks; track $index) {
+            <div class="link-row">
+              <input type="text" placeholder="cole um link..." [(ngModel)]="link.url" [name]="'link-url-' + $index" />
+              <input type="text" placeholder="rótulo (ex: partitura)" [(ngModel)]="link.label" [name]="'link-label-' + $index" />
+              @if (newLinks.length > 1) {
+                <button type="button" class="secondary" (click)="removeLinkRow($index)">✕</button>
+              }
+            </div>
+          }
+          <button type="button" class="secondary" (click)="addLinkRow()">+ adicionar link</button>
+        </div>
+
+        <button type="submit">Adicionar</button>
+      </form>
+    </aside>
+  </div>
+</main>

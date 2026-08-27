@@ -1,0 +1,142 @@
+<main class="page page--wide">
+  <div class="section-header">
+    <h1>Execuções</h1>
+    <div class="filter-bar">
+      <span class="filter-bar__label">filtrar:</span>
+      <select id="filterMode" name="filterMode" [(ngModel)]="filterMode" (ngModelChange)="onFilterModeChange()">
+        <option value="none">todas</option>
+        <option value="training">por treino</option>
+        <option value="goal">por meta</option>
+      </select>
+      @if (filterMode === 'training') {
+        <select id="filterTraining" name="filterTraining" [(ngModel)]="filterId" (ngModelChange)="reloadExecutions()">
+          <option [ngValue]="null">(todos)</option>
+          @for (item of trainingsForSelect(); track item.training.id) {
+            <option [ngValue]="item.training.id">{{ item.label }}</option>
+          }
+        </select>
+      }
+      @if (filterMode === 'goal') {
+        <select id="filterGoal" name="filterGoal" [(ngModel)]="filterId" (ngModelChange)="reloadExecutions()">
+          <option [ngValue]="null">(todas)</option>
+          @for (goal of goals(); track goal.id) {
+            <option [ngValue]="goal.id">{{ goal.title }}</option>
+          }
+        </select>
+      }
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="muted">Carregando...</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <div class="two-col">
+    <div class="two-col__list">
+      <div class="table-zebra">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Treino</th>
+              <th>Duração</th>
+              <th>Sentiu</th>
+              <th>Origem</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (execution of executions(); track execution.id) {
+              <tr [title]="execution.generalNotes ?? ''">
+                <td class="mono">{{ formatDateShort(execution.executionDate) }}</td>
+                <td>{{ trainingLabel(execution) }}</td>
+                <td class="mono">{{ execution.actualDurationMinutes ?? '-' }} min</td>
+                <td>{{ execution.feeling ?? '-' }}</td>
+                <td><app-badge [variant]="'origin-' + execution.createdBy" [label]="execution.createdBy" /></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="empty">Nenhuma execução registrada ainda.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <span class="panel__title">REGISTRAR EXECUÇÃO</span>
+      <form class="stacked" (ngSubmit)="createExecution()">
+        <div class="field">
+          <label for="training">treino *</label>
+          <select id="training" name="training" required [(ngModel)]="selectedTrainingId" (ngModelChange)="onTrainingSelected()">
+            <option [ngValue]="null" disabled>selecione um treino</option>
+            @for (item of trainingsForSelect(); track item.training.id) {
+              <option [ngValue]="item.training.id">{{ item.label }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="executionDate">data *</label>
+            <input id="executionDate" type="date" name="executionDate" required [(ngModel)]="executionDate" />
+          </div>
+          <div class="field">
+            <label for="duration">duração real (min)</label>
+            <input id="duration" type="number" min="1" name="duration" [(ngModel)]="actualDurationMinutes" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="feeling">como se sentiu</label>
+          <input id="feeling" type="text" name="feeling" placeholder="ex: cansado, animado" [(ngModel)]="feeling" />
+        </div>
+
+        <div class="field">
+          <label for="goal">meta relacionada</label>
+          <select id="goal" name="goal" [(ngModel)]="goalId">
+            <option [ngValue]="null">(nenhuma)</option>
+            @for (goal of goals(); track goal.id) {
+              <option [ngValue]="goal.id">{{ goal.title }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="notes">notas gerais</label>
+          <textarea id="notes" name="notes" [(ngModel)]="generalNotes"></textarea>
+        </div>
+
+        @if (exercisesLoading) {
+          <p class="muted">Carregando exercícios do treino...</p>
+        }
+
+        @if (exerciseLogs.length > 0) {
+          <div class="field">
+            <label>bpm alcançado por exercício</label>
+            <div class="exercise-log-list">
+              @for (log of exerciseLogs; track log.exerciseId) {
+                <div class="exercise-log-row">
+                  <div class="exercise-log-row__head">
+                    <span>{{ log.name }}</span>
+                    @if (log.targetBpm) {
+                      <span class="muted mono">alvo {{ log.targetBpm }}</span>
+                    }
+                  </div>
+                  <div class="exercise-log-row__inputs">
+                    <input type="number" min="1" placeholder="bpm" [(ngModel)]="log.achievedBpm" [name]="'bpm-' + log.exerciseId" />
+                    <input type="number" min="1" placeholder="seg" [(ngModel)]="log.actualDurationSeconds" [name]="'duration-' + log.exerciseId" />
+                  </div>
+                  <input type="text" placeholder="notas do exercício" [(ngModel)]="log.notes" [name]="'notes-' + log.exerciseId" />
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <button type="submit" [disabled]="selectedTrainingId == null">Registrar execução</button>
+      </form>
+    </aside>
+  </div>
+</main>

@@ -1,0 +1,85 @@
+<main class="page page--wide">
+  <div class="section-header">
+    <h1>Metas</h1>
+    <span class="muted" style="font-size: 0.78rem;">o ícone de estrela marca qual fica em foco no Dashboard — ideal manter só uma</span>
+  </div>
+
+  @if (loading()) {
+    <p class="muted">Carregando...</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <div class="two-col">
+    <div class="two-col__list">
+      @for (goal of goals(); track goal.id) {
+        <div class="row-card" [class.row-card--accent]="goal.inFocus" [class.row-card--strong]="goal.inFocus">
+          @if (goal.status === 'ACHIEVED' || goal.status === 'ABANDONED') {
+            <span class="star-btn" style="visibility: hidden;"></span>
+          } @else if (goal.inFocus) {
+            <span class="star-btn star-btn--filled" title="Meta em foco" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="var(--color-accent-contrast)" stroke="none">
+                <path d="M12 2 L14.9 8.6 L22 9.4 L16.7 14.2 L18.2 21.2 L12 17.6 L5.8 21.2 L7.3 14.2 L2 9.4 L9.1 8.6 Z" />
+              </svg>
+            </span>
+          } @else {
+            <button type="button" class="icon-btn star-btn" (click)="focusGoal(goal)" title="Marcar como foco no Dashboard">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                <path d="M12 2 L14.9 8.6 L22 9.4 L16.7 14.2 L18.2 21.2 L12 17.6 L5.8 21.2 L7.3 14.2 L2 9.4 L9.1 8.6 Z" />
+              </svg>
+            </button>
+          }
+
+          <div class="row-card__main">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <a [routerLink]="['/goals', goal.id]" style="font-weight: 600;">{{ goal.title }}</a>
+              @if (goal.inFocus) {
+                <app-badge variant="focus" label="em foco" />
+              }
+            </div>
+            <span class="muted" style="font-size: 0.78rem;">
+              {{ goal.targetDate ? 'até ' + formatDateBr(goal.targetDate) : 'sem prazo definido' }}
+              · {{ trainingCountByGoalId().get(goal.id) ?? 0 }} treino(s) cadastrado(s)
+            </span>
+          </div>
+
+          <div class="row-card__side">
+            @if (goal.targetMetric) {
+              <span class="mono">{{ goal.targetMetric }}</span>
+            }
+            <app-badge [variant]="goal.status" [label]="goalStatusLabel(goal.status)" />
+            <a [routerLink]="['/goals', goal.id]" class="icon-btn chevron" aria-label="Ver detalhe da meta">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 L15 12 L9 18" /></svg>
+            </a>
+          </div>
+        </div>
+      } @empty {
+        <p class="empty">Nenhuma meta cadastrada ainda.</p>
+      }
+    </div>
+
+    <aside class="panel">
+      <span class="panel__title">NOVA META</span>
+      <form class="stacked" (ngSubmit)="createGoal()">
+        <div class="field">
+          <label for="title">título *</label>
+          <input id="title" type="text" name="title" required [(ngModel)]="newTitle" />
+        </div>
+        <div class="field">
+          <label for="description">descrição</label>
+          <textarea id="description" name="description" [(ngModel)]="newDescription"></textarea>
+        </div>
+        <div class="field">
+          <label for="targetMetric">métrica alvo (opcional)</label>
+          <input id="targetMetric" type="text" name="targetMetric" placeholder="ex: 140 bpm" [(ngModel)]="newTargetMetric" />
+        </div>
+        <div class="field">
+          <label for="targetDate">prazo (opcional)</label>
+          <input id="targetDate" type="date" name="targetDate" [(ngModel)]="newTargetDate" />
+        </div>
+        <button type="submit">Criar meta</button>
+      </form>
+    </aside>
+  </div>
+</main>

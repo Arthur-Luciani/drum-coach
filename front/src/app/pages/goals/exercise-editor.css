@@ -1,0 +1,61 @@
+.exercise-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  margin-top: 0.4rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+}
+
+.exercise-editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exercise-editor__kind {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+
+.exercise-editor button[type='button']:not(.link),
+.exercise-editor button[type='submit'] {
+  align-self: flex-start;
+}
+
+.exercise-editor__passages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+}
+
+.passage-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.82rem;
+}
+
+.passage-row__label {
+  color: var(--color-text-tertiary);
+}
+
+.passage-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.3rem;
+}
+
+.passage-add .field input {
+  width: 8rem;
+}
+
+.link.danger {
+  color: var(--color-danger);
+}

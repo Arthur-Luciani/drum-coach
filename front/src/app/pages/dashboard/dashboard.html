@@ -1,0 +1,153 @@
+<main class="page page--wide">
+  @if (loading()) {
+    <p class="muted">Carregando...</p>
+  }
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  <!-- Hero: meta em foco -->
+  @if (focusedGoalDetail(); as detail) {
+    <section class="hero">
+      <div class="hero__main">
+        <span class="hero__eyebrow mono">META ATIVA</span>
+        <h1 class="hero__title">{{ detail.goal.title }}</h1>
+        <p class="hero__subtitle">
+          @if (detail.goal.targetMetric) {
+            alvo: {{ detail.goal.targetMetric }} ·
+          }
+          {{ detail.trainings.length }} treino{{ detail.trainings.length === 1 ? '' : 's' }} cadastrado{{ detail.trainings.length === 1 ? '' : 's' }} nessa meta
+        </p>
+      </div>
+      <div class="hero__action">
+        <button type="button" class="hero__cta" (click)="openTrainingPicker()">
+          <span>Escolher treino</span>
+          <app-key-cap label="Enter" />
+        </button>
+        <span class="hero__hint">você decide o quão longa vai a sessão hoje</span>
+      </div>
+    </section>
+  } @else {
+    <section class="hero hero--empty">
+      <p class="empty">Nenhuma meta em foco no momento. <a routerLink="/goals">Escolha uma em Metas</a>.</p>
+    </section>
+  }
+
+  <!-- Cards secundarios -->
+  <div class="dash-grid">
+    <section class="dash-card">
+      <span class="panel__title">TREINOS DESSA META</span>
+      @if (focusedGoalDetail(); as detail) {
+        <div class="dash-training-list">
+          @for (training of detail.trainings; track training.trainingId) {
+            <div class="dash-training">
+              <div class="dash-training__row">
+                <span class="dash-training__name">{{ training.name }}</span>
+                @if (training.targetRepetitions) {
+                  <span class="mono dash-training__count">{{ training.completedCount }}/{{ training.targetRepetitions }}</span>
+                } @else {
+                  <span class="mono dash-training__count">{{ training.completedCount }}x</span>
+                }
+              </div>
+              <app-progress-bar [value]="training.completedCount" [max]="training.targetRepetitions" />
+            </div>
+          } @empty {
+            <p class="empty">Nenhum treino cadastrado nesta meta ainda.</p>
+          }
+        </div>
+      } @else {
+        <p class="empty">Nenhuma meta em foco no momento.</p>
+      }
+    </section>
+
+    <section class="dash-card">
+      <span class="panel__title">OUTRAS METAS EM ANDAMENTO</span>
+      <div class="dash-goal-list">
+        @for (goal of otherGoalsInProgress(); track goal.id) {
+          <a class="dash-goal-row" [routerLink]="['/goals', goal.id]">
+            <span class="dash-goal-row__name">{{ goal.title }}</span>
+            @if (goal.targetMetric) {
+              <span class="mono dash-chip">{{ goal.targetMetric }}</span>
+            } @else {
+              <app-badge [variant]="goal.status" [label]="goalStatusLabel(goal.status)" />
+            }
+          </a>
+        } @empty {
+          <p class="empty">Nenhuma outra meta em andamento.</p>
+        }
+      </div>
+      <a class="dash-card__footer-link" routerLink="/goals">ver todas as metas →</a>
+    </section>
+
+    <section class="dash-card">
+      <span class="panel__title">ÚLTIMA SESSÃO</span>
+      @if (recentExecutions()[0]; as execution) {
+        <div class="dash-last-session">
+          <span class="dash-last-session__main">
+            {{ formatDateShort(execution.executionDate) }} · {{ trainingLabel(execution) }}
+          </span>
+          <span class="dash-last-session__meta">
+            {{ execution.actualDurationMinutes ?? '?' }} min
+            @if (execution.feeling) {
+              · {{ execution.feeling }}
+            }
+          </span>
+        </div>
+      } @else {
+        <p class="empty">Nenhuma execução registrada ainda.</p>
+      }
+    </section>
+  </div>
+
+  <!-- Aulas recentes -->
+  <section class="dash-card dash-card--wide">
+    <div class="section-header">
+      <span class="panel__title">AULAS RECENTES</span>
+      <a routerLink="/lessons">ver todas →</a>
+    </div>
+    <div class="dash-lesson-list">
+      @for (lesson of recentLessons(); track lesson.id) {
+        <div class="row-card row-card--column">
+          <strong class="mono">{{ formatDateShort(lesson.lessonDate) }}</strong>
+          @if (lesson.teacherNotes) {
+            <span class="muted">{{ lesson.teacherNotes }}</span>
+          }
+        </div>
+      } @empty {
+        <p class="empty">Nenhuma aula registrada ainda.</p>
+      }
+    </div>
+  </section>
+
+  <!-- Execucoes recentes -->
+  <section class="dash-card dash-card--wide">
+    <div class="section-header">
+      <span class="panel__title">EXECUÇÕES RECENTES</span>
+      <a routerLink="/executions">ver todas →</a>
+    </div>
+    <div class="table-zebra">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Treino</th>
+            <th>Duração</th>
+            <th>Sensação</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (execution of recentExecutions(); track execution.id) {
+            <tr>
+              <td class="mono">{{ formatDateShort(execution.executionDate) }}</td>
+              <td>{{ trainingLabel(execution) }}</td>
+              <td class="mono">{{ execution.actualDurationMinutes ?? '-' }} min</td>
+              <td>{{ execution.feeling ?? '-' }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="4" class="empty">Nenhuma execução registrada ainda.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
