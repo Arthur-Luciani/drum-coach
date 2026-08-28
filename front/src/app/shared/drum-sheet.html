@@ -1,128 +1,159 @@
 @let m = model();
-@let hs = highlightStep();
+@let hs = effectiveHighlight();
 
-<div class="drum-sheet" [class.editable]="editable()">
-  <svg [attr.viewBox]="m.viewBox" preserveAspectRatio="xMidYMid meet" role="img"
-       [attr.aria-label]="ariaLabel()">
+<div class="drum-sheet" [class.editable]="editable()" [class.roll]="roll()">
+  <svg [attr.viewBox]="roll() ? rollViewBox() : m.viewBox" preserveAspectRatio="xMidYMid meet"
+       role="img" [attr.aria-label]="ariaLabel()">
 
-    <!-- grade de subdivisao / tempo -->
-    @for (g of m.gridLines; track $index) {
-      <line [class]="'grid-' + g.kind" [attr.x1]="g.x" [attr.y1]="g.y1"
-            [attr.x2]="g.x" [attr.y2]="g.y2" />
-    }
-
-    <!-- dot-grid -->
-    @for (row of m.rows; track row.voice) {
-      <text class="dotlabel" [attr.x]="row.labelX" [attr.y]="row.labelY">{{ row.label }}</text>
-      @for (cell of row.cells; track cell.step) {
-        <circle class="dot" [class.on]="cell.on"
-                [class.hit]="cell.on && hs === cell.step"
-                [attr.cx]="cell.x" [attr.cy]="cell.y" r="3.4"
-                [attr.data-voice]="row.voice" [attr.data-step]="cell.step"
-                (click)="onCellClick(row.voice, cell.step)" />
+    @if (roll()) {
+      <!-- linhas da pauta continuas na janela inteira (sem emenda entre tiles) -->
+      @for (ln of rollStaffLines(); track $index) {
+        <line class="stafflines" [attr.x1]="ln.x1" [attr.y1]="ln.y"
+              [attr.x2]="ln.x2" [attr.y2]="ln.y" />
       }
+      <!-- faixa da linha "agora" (fixa) -->
+      <rect class="now-band" [attr.x]="playlineXRoll() - 11" y="0" width="22" [attr.height]="m.height" />
+
+      <!-- o loop, repetido lado a lado, deslizando sob a linha "agora" -->
+      @for (tx of rollTiles(); track $index) {
+        <g [attr.transform]="'translate(' + tx + ' 0)'">
+          <ng-container [ngTemplateOutlet]="marks" />
+        </g>
+      }
+
+      <!-- linha "agora" (fixa) -->
+      <line class="ph-glow" [attr.x1]="playlineXRoll()" [attr.x2]="playlineXRoll()"
+            y1="4" [attr.y2]="m.height - 4" />
+      <line class="ph" [attr.x1]="playlineXRoll()" [attr.x2]="playlineXRoll()"
+            y1="4" [attr.y2]="m.height - 4" />
+    } @else {
+      <ng-container [ngTemplateOutlet]="marks" />
+
+      <!-- playhead corre sobre a pauta parada -->
+      <line class="ph-glow" [attr.x1]="playheadX()" [attr.x2]="playheadX()"
+            y1="4" [attr.y2]="m.height - 4" />
+      <line class="ph" [attr.x1]="playheadX()" [attr.x2]="playheadX()"
+            y1="4" [attr.y2]="m.height - 4" />
     }
 
-    <!-- linhas da pauta -->
-    @for (ln of m.staffLines; track $index) {
-      <line class="stafflines" [attr.x1]="ln.x1" [attr.y1]="ln.y1"
-            [attr.x2]="ln.x2" [attr.y2]="ln.y2" />
-    }
+    <ng-template #marks>
+      <!-- grade de subdivisao / tempo -->
+      @for (g of m.gridLines; track $index) {
+        <line [class]="'grid-' + g.kind" [attr.x1]="g.x" [attr.y1]="g.y1"
+              [attr.x2]="g.x" [attr.y2]="g.y2" />
+      }
 
-    <!-- barras de compasso -->
-    @for (bl of m.barLines; track $index) {
-      <line [class]="bl.end ? 'barline end' : 'barline'" [attr.x1]="bl.x" [attr.y1]="bl.y1"
-            [attr.x2]="bl.x" [attr.y2]="bl.y2" />
-    }
-
-    <!-- clave de percussao -->
-    <rect class="clef" [attr.x]="m.clef.x1" [attr.y]="m.clef.y"
-          [attr.width]="m.clef.barWidth" [attr.height]="m.clef.height" />
-    <rect class="clef" [attr.x]="m.clef.x2" [attr.y]="m.clef.y"
-          [attr.width]="m.clef.barWidth" [attr.height]="m.clef.height" />
-
-    <!-- formula de compasso -->
-    <text class="timesig" [attr.x]="m.timeSig.x" [attr.y]="m.timeSig.topY"
-          text-anchor="middle" [attr.font-size]="m.timeSig.fontSize"
-          dominant-baseline="central">{{ m.timeSig.topText }}</text>
-    <text class="timesig" [attr.x]="m.timeSig.x" [attr.y]="m.timeSig.bottomY"
-          text-anchor="middle" [attr.font-size]="m.timeSig.fontSize"
-          dominant-baseline="central">{{ m.timeSig.bottomText }}</text>
-
-    <!-- linhas suplementares -->
-    @for (lg of m.ledgerLines; track $index) {
-      <line class="ledger" [attr.x1]="lg.x1" [attr.y1]="lg.y1"
-            [attr.x2]="lg.x2" [attr.y2]="lg.y2" />
-    }
-
-    <!-- pausas -->
-    @for (r of m.rests; track $index) {
-      <g class="rest" [attr.transform]="'translate(' + r.x + ' ' + r.y + ')'">
-        @switch (r.kind) {
-          @case ('quarter') {
-            <path class="rest-line" d="M-3 -7 q5 4 1 8 q-4 4 1 8 q4 3 -1 7" />
-          }
-          @case ('eighth') {
-            <circle cx="1" cy="-3" r="1.8" />
-            <path class="rest-line" d="M2.2 -2.4 L-2 8" />
-          }
-          @case ('sixteenth') {
-            <circle cx="1" cy="-4" r="1.7" />
-            <circle cx="-0.6" cy="0.6" r="1.7" />
-            <path class="rest-line" d="M2.4 -3.4 L-2.6 9" />
-          }
+      <!-- dot-grid (rotulos de voz so fora do modo roll - rolariam junto e ficariam ilegiveis) -->
+      @for (row of m.rows; track row.voice) {
+        @if (!roll()) {
+          <text class="dotlabel" [attr.x]="row.labelX" [attr.y]="row.labelY">{{ row.label }}</text>
         }
-      </g>
-    }
-
-    <!-- hastes -->
-    @for (st of m.stems; track $index) {
-      <line class="stem" [attr.x1]="st.x" [attr.y1]="st.y1" [attr.x2]="st.x" [attr.y2]="st.y2" />
-    }
-
-    <!-- ligaduras (beams) -->
-    @for (bm of m.beams; track $index) {
-      <line class="beam" [attr.x1]="bm.x1" [attr.y1]="bm.y" [attr.x2]="bm.x2" [attr.y2]="bm.y" />
-    }
-
-    <!-- bandeirolas -->
-    @for (fl of m.flags; track $index) {
-      <path class="flag" [attr.d]="flagPath(fl)" />
-    }
-
-    <!-- cabecas de nota -->
-    @for (h of m.heads; track $index) {
-      @if (h.headType === 'x') {
-        <path class="nh-x" [class.hit]="hs === h.step" [attr.d]="xHeadPath(h)" />
-      } @else {
-        <ellipse class="nh" [class.hit]="hs === h.step"
-                 [attr.cx]="h.x" [attr.cy]="h.y" rx="4" ry="3"
-                 [attr.transform]="'rotate(-20 ' + h.x + ' ' + h.y + ')'" />
+        @for (cell of row.cells; track cell.step) {
+          <circle class="dot" [class.on]="cell.on"
+                  [class.hit]="cell.on && hs === cell.step"
+                  [attr.cx]="cell.x" [attr.cy]="cell.y" r="3.4"
+                  [attr.data-voice]="row.voice" [attr.data-step]="cell.step"
+                  (click)="onCellClick(row.voice, cell.step)" />
+        }
       }
-    }
 
-    <!-- acentos -->
-    @for (a of m.accents; track $index) {
-      <path class="accent"
-            [attr.d]="'M' + (a.x - 4) + ' ' + a.y + ' L' + (a.x + 3) + ' ' + (a.y + 2.5) + ' L' + (a.x - 4) + ' ' + (a.y + 5)" />
-    }
+      <!-- linhas da pauta (no modo roll sao desenhadas fixas acima) -->
+      @if (!roll()) {
+        @for (ln of m.staffLines; track $index) {
+          <line class="stafflines" [attr.x1]="ln.x1" [attr.y1]="ln.y1"
+                [attr.x2]="ln.x2" [attr.y2]="ln.y2" />
+        }
+      }
 
-    <!-- sticking -->
-    @for (s of m.sticking; track $index) {
-      <text class="stick" [attr.x]="s.x" [attr.y]="s.y" text-anchor="middle">{{ s.label }}</text>
-    }
+      <!-- barras de compasso -->
+      @for (bl of m.barLines; track $index) {
+        <line [class]="bl.end ? 'barline end' : 'barline'" [attr.x1]="bl.x" [attr.y1]="bl.y1"
+              [attr.x2]="bl.x" [attr.y2]="bl.y2" />
+      }
 
-    <!-- colchetes de tercina -->
-    @for (t of m.tuplets; track $index) {
-      <path class="tuplet-bracket" [attr.d]="tupletPath(t)" />
-      <text class="tuplet-num" [attr.x]="(t.x1 + t.x2) / 2" [attr.y]="t.y + 2"
-            text-anchor="middle">{{ t.text }}</text>
-    }
+      <!-- clave + formula de compasso (sem sentido rolando) -->
+      @if (!roll()) {
+        <rect class="clef" [attr.x]="m.clef.x1" [attr.y]="m.clef.y"
+              [attr.width]="m.clef.barWidth" [attr.height]="m.clef.height" />
+        <rect class="clef" [attr.x]="m.clef.x2" [attr.y]="m.clef.y"
+              [attr.width]="m.clef.barWidth" [attr.height]="m.clef.height" />
+        <text class="timesig" [attr.x]="m.timeSig.x" [attr.y]="m.timeSig.topY"
+              text-anchor="middle" [attr.font-size]="m.timeSig.fontSize"
+              dominant-baseline="central">{{ m.timeSig.topText }}</text>
+        <text class="timesig" [attr.x]="m.timeSig.x" [attr.y]="m.timeSig.bottomY"
+              text-anchor="middle" [attr.font-size]="m.timeSig.fontSize"
+              dominant-baseline="central">{{ m.timeSig.bottomText }}</text>
+      }
 
-    <!-- playhead -->
-    <line class="ph-glow" [attr.x1]="playheadX()" [attr.x2]="playheadX()"
-          y1="4" [attr.y2]="m.height - 4" />
-    <line class="ph" [attr.x1]="playheadX()" [attr.x2]="playheadX()"
-          y1="4" [attr.y2]="m.height - 4" />
+      <!-- linhas suplementares -->
+      @for (lg of m.ledgerLines; track $index) {
+        <line class="ledger" [attr.x1]="lg.x1" [attr.y1]="lg.y1"
+              [attr.x2]="lg.x2" [attr.y2]="lg.y2" />
+      }
+
+      <!-- pausas -->
+      @for (r of m.rests; track $index) {
+        <g class="rest" [attr.transform]="'translate(' + r.x + ' ' + r.y + ')'">
+          @switch (r.kind) {
+            @case ('quarter') {
+              <path class="rest-line" d="M-3 -7 q5 4 1 8 q-4 4 1 8 q4 3 -1 7" />
+            }
+            @case ('eighth') {
+              <circle cx="1" cy="-3" r="1.8" />
+              <path class="rest-line" d="M2.2 -2.4 L-2 8" />
+            }
+            @case ('sixteenth') {
+              <circle cx="1" cy="-4" r="1.7" />
+              <circle cx="-0.6" cy="0.6" r="1.7" />
+              <path class="rest-line" d="M2.4 -3.4 L-2.6 9" />
+            }
+          }
+        </g>
+      }
+
+      <!-- hastes -->
+      @for (st of m.stems; track $index) {
+        <line class="stem" [attr.x1]="st.x" [attr.y1]="st.y1" [attr.x2]="st.x" [attr.y2]="st.y2" />
+      }
+
+      <!-- ligaduras (beams) -->
+      @for (bm of m.beams; track $index) {
+        <line class="beam" [attr.x1]="bm.x1" [attr.y1]="bm.y" [attr.x2]="bm.x2" [attr.y2]="bm.y" />
+      }
+
+      <!-- bandeirolas -->
+      @for (fl of m.flags; track $index) {
+        <path class="flag" [attr.d]="flagPath(fl)" />
+      }
+
+      <!-- cabecas de nota -->
+      @for (h of m.heads; track $index) {
+        @if (h.headType === 'x') {
+          <path class="nh-x" [class.hit]="hs === h.step" [attr.d]="xHeadPath(h)" />
+        } @else {
+          <ellipse class="nh" [class.hit]="hs === h.step"
+                   [attr.cx]="h.x" [attr.cy]="h.y" rx="4" ry="3"
+                   [attr.transform]="'rotate(-20 ' + h.x + ' ' + h.y + ')'" />
+        }
+      }
+
+      <!-- acentos -->
+      @for (a of m.accents; track $index) {
+        <path class="accent"
+              [attr.d]="'M' + (a.x - 4) + ' ' + a.y + ' L' + (a.x + 3) + ' ' + (a.y + 2.5) + ' L' + (a.x - 4) + ' ' + (a.y + 5)" />
+      }
+
+      <!-- sticking -->
+      @for (s of m.sticking; track $index) {
+        <text class="stick" [attr.x]="s.x" [attr.y]="s.y" text-anchor="middle">{{ s.label }}</text>
+      }
+
+      <!-- colchetes de tercina -->
+      @for (t of m.tuplets; track $index) {
+        <path class="tuplet-bracket" [attr.d]="tupletPath(t)" />
+        <text class="tuplet-num" [attr.x]="(t.x1 + t.x2) / 2" [attr.y]="t.y + 2"
+              text-anchor="middle">{{ t.text }}</text>
+      }
+    </ng-template>
   </svg>
 </div>

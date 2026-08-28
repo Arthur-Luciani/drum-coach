@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { MetronomeService, calcularCountIn } from './metronome.service';
+import {
+  MetronomeService,
+  calcularCountIn,
+  cliquesPorTempoDoPattern,
+  subdivisaoDoPattern,
+} from './metronome.service';
 
 /** Dublês minimos dos nós Web Audio usados por `MetronomeService` - registram o que foi
  * chamado (tipo de onda, frequencia, start/stop) sem depender de um `AudioContext` real
@@ -101,6 +106,77 @@ describe('calcularCountIn', () => {
     // duracao do compasso = 4*60/120 = 2s -> precisa de 5 compassos pra >= 10s.
     expect(resultado.numeroDeCompassos).toBe(5);
     expect(resultado.duracaoTotalSegundos).toBeCloseTo(10, 6);
+  });
+});
+
+/**
+ * `cliquesPorTempoDoPattern` - a subdivisao REAL do exercicio como numero (base tanto da
+ * subdivisao de clique quanto da janela adaptativa da pauta).
+ */
+describe('cliquesPorTempoDoPattern', () => {
+  it('sem hits: usa o stepsPerBeat declarado', () => {
+    expect(cliquesPorTempoDoPattern(1)).toBe(1);
+    expect(cliquesPorTempoDoPattern(2)).toBe(2);
+    expect(cliquesPorTempoDoPattern(4)).toBe(4);
+  });
+
+  it('usa a posicao real das notas, nao a resolucao da grade', () => {
+    // grade de 16, mas notas so em posicoes de colcheia -> 2 cliques/tempo
+    expect(cliquesPorTempoDoPattern(4, [0, 2, 4, 6, 8, 10, 12, 14])).toBe(2);
+    // uma nota fora da grade de colcheia -> volta pra 4
+    expect(cliquesPorTempoDoPattern(4, [0, 2, 5])).toBe(4);
+    // tercina real
+    expect(cliquesPorTempoDoPattern(3, [0, 1, 2, 3, 4, 5])).toBe(3);
+  });
+
+  it('hit no indice 0 nao restringe; so a cabeca do compasso -> 1', () => {
+    expect(cliquesPorTempoDoPattern(4, [0])).toBe(1);
+    expect(cliquesPorTempoDoPattern(4, [0, 8, 16])).toBe(1);
+  });
+
+  it('subdivisao prima (quintina) fica como esta', () => {
+    expect(cliquesPorTempoDoPattern(5, [0, 1, 2, 3, 4])).toBe(5);
+  });
+});
+
+/**
+ * `subdivisaoDoPattern` - deriva a subdivisao de clique do metronomo da grade ritmica de
+ * um `DrumPattern`, pra o Modo Sessao fazer o exercicio herdar a subdivisao em que foi
+ * escrito (ver `SessionStateService.iniciarExercicioAtual`).
+ */
+describe('subdivisaoDoPattern', () => {
+  it('sem hits: cai no stepsPerBeat declarado', () => {
+    expect(subdivisaoDoPattern(1, false)).toBe('quarter');
+    expect(subdivisaoDoPattern(2, false)).toBe('eighth');
+    expect(subdivisaoDoPattern(3, true)).toBe('triplet');
+    expect(subdivisaoDoPattern(4, false)).toBe('sixteenth');
+  });
+
+  it('usa a subdivisao REAL das notas, nao a resolucao da grade', () => {
+    // Grade de semicolcheia (stepsPerBeat 4) mas notas so em posicoes de colcheia
+    // (indices pares) -> clique em colcheia, nao em semicolcheia. Bug do "Banco de
+    // viradas": groove todo em colcheias numa grade de 16 tocava clique em 4/tempo.
+    const soPares = [0, 2, 4, 6, 8, 10, 12, 14, 46, 48, 50];
+    expect(subdivisaoDoPattern(4, false, soPares)).toBe('eighth');
+
+    // Uma unica nota fora da grade de colcheia (indice impar) -> volta pra semicolcheia.
+    expect(subdivisaoDoPattern(4, false, [0, 2, 4, 7])).toBe('sixteenth');
+
+    // Tercina: 3 steps/tempo, notas em todos -> tercina.
+    expect(subdivisaoDoPattern(3, true, [0, 1, 2, 3, 4, 5])).toBe('triplet');
+
+    // Sextina escrita so nas posicoes de tercina (pares) -> tercina.
+    expect(subdivisaoDoPattern(6, true, [0, 2, 4, 6, 8, 10])).toBe('triplet');
+  });
+
+  it('hit no indice 0 nao restringe (gcd(k, 0) = k)', () => {
+    expect(subdivisaoDoPattern(4, false, [0])).toBe('quarter'); // so a cabeca do compasso
+    expect(subdivisaoDoPattern(4, false, [0, 8, 16])).toBe('quarter'); // so tempos cheios
+  });
+
+  it('cliques/tempo sem casamento exato: maior divisor coerente (`tuplet` puxa pra base 3)', () => {
+    expect(subdivisaoDoPattern(8, false, [0, 1, 2, 3, 4, 5, 6, 7])).toBe('sixteenth');
+    expect(subdivisaoDoPattern(5, false, [0, 1, 2, 3, 4])).toBe('quarter'); // quintina: sem clique coerente
   });
 });
 

@@ -1,12 +1,13 @@
 import { Injectable, signal } from '@angular/core';
 
 /** Subdivisao do pulso do metronomo - cada uma multiplica quantos cliques soam por tempo. */
-export type Subdivisao = 'quarter' | 'eighth' | 'triplet';
+export type Subdivisao = 'quarter' | 'eighth' | 'triplet' | 'sixteenth';
 
 const SUBDIVISION_MULTIPLIER: Record<Subdivisao, number> = {
   quarter: 1,
   eighth: 2,
   triplet: 3,
+  sixteenth: 4,
 };
 
 /** Janela de lookahead: o scheduler agenda no AudioContext qualquer clique cujo horario
@@ -34,8 +35,8 @@ export type NivelClique = 'acento' | 'tempo' | 'subdivisao';
 /** Pico do envelope de ganho por nivel de clique. */
 const CLICK_GAIN: Record<NivelClique, number> = {
   acento: 0.9,
-  tempo: 0.55,
-  subdivisao: 0.22,
+  tempo: 0.6,
+  subdivisao: 0.13,
 };
 
 /** Duracao (attack+release) de cada tom do aviso de "tempo previsto cumprido" (Fase
@@ -60,6 +61,73 @@ export function calcularCountIn(
   const numeroDeCompassos = Math.max(1, Math.ceil(minSeconds / duracaoCompassoSegundos));
   const duracaoTotalSegundos = numeroDeCompassos * duracaoCompassoSegundos;
   return { duracaoCompassoSegundos, numeroDeCompassos, duracaoTotalSegundos };
+}
+
+function gcd(a: number, b: number): number {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  while (b) {
+    [a, b] = [b, a % b];
+  }
+  return a;
+}
+
+/** Mapeia "N cliques por tempo" pra uma das subdivisoes disponiveis. Quando N nao casa
+ * direto com 1/2/3/4, cai no maior multiplicador que o divide por igual (`tuplet` empurra
+ * pra base 3 quando cabe); N "primo" (5, 7) nao tem clique coerente e fica no pulso. */
+function subdivisaoDeCliquesPorTempo(cliquesPorTempo: number, tuplet: boolean): Subdivisao {
+  const n = Math.max(1, Math.round(cliquesPorTempo));
+  if (n <= 1) return 'quarter';
+  if (n === 2) return 'eighth';
+  if (n === 3) return 'triplet';
+  if (tuplet && n % 3 === 0) return 'triplet';
+  if (n % 4 === 0) return 'sixteenth';
+  if (n % 3 === 0) return 'triplet';
+  if (n % 2 === 0) return 'eighth';
+  return 'quarter';
+}
+
+/**
+ * Cliques por tempo REAIS de um pattern, como numero: a subdivisao em que o exercicio de
+ * fato toca.
+ *
+ * NAO e o `stepsPerBeat` cru - essa e so a RESOLUCAO da grade do editor. Um groove escrito
+ * numa grade de semicolcheia mas com notas so em posicoes de colcheia soa (e deve bater)
+ * em colcheias. O valor real e `stepsPerBeat / k`, onde `k` e o maior passo que divide
+ * `stepsPerBeat` E todos os indices de hit (todo hit cai sobre um clique). `hitIndices`
+ * vazio (pattern sem nota): cai no `stepsPerBeat` declarado.
+ *
+ * Base tanto da subdivisao de clique do metronomo ({@link subdivisaoDoPattern}) quanto da
+ * janela adaptativa da pauta rolante (ver `DrumSheetComponent` / `SessionPage`).
+ */
+export function cliquesPorTempoDoPattern(
+  stepsPerBeat: number,
+  hitIndices: readonly number[] = [],
+): number {
+  const steps = Math.max(1, Math.floor(stepsPerBeat));
+  let k = hitIndices.length ? steps : 1;
+  for (const idx of hitIndices) {
+    k = gcd(k, idx);
+    if (k === 1) {
+      break;
+    }
+  }
+  return Math.max(1, Math.round(steps / k));
+}
+
+/**
+ * Deriva a subdivisao de clique do metronomo a partir da grade ritmica de um
+ * `DrumPattern` - usada pelo Modo Sessao pra fazer o metronomo de um exercicio herdar a
+ * subdivisao em que ele foi escrito (um exercicio em tercinas ganha clique em tercinas,
+ * nao em seminimas). Pura e sem depender do tipo `DrumPattern` (recebe so os campos
+ * necessarios) pra ficar trivial de testar.
+ */
+export function subdivisaoDoPattern(
+  stepsPerBeat: number,
+  tuplet: boolean,
+  hitIndices: readonly number[] = [],
+): Subdivisao {
+  return subdivisaoDeCliquesPorTempo(cliquesPorTempoDoPattern(stepsPerBeat, hitIndices), tuplet);
 }
 
 /**

@@ -18,12 +18,17 @@ import { Exercise } from '../../models';
 import { DrumSheetComponent } from '../../shared/drum-sheet';
 import { formatClock, formatDurationLabel } from '../../shared/format';
 import { KeyCap } from '../../shared/key-cap';
-import { COMPASSO_FIXO, SessionStateService } from './session-state.service';
+import { SessionStateService } from './session-state.service';
 
 const BPM_MIN = 30;
 const BPM_MAX = 300;
 const BPM_STEP = 1;
 const BPM_STEP_SHIFT = 5;
+
+/** Até este número de compassos a pauta é mostrada INTEIRA e parada, com o playhead
+ * correndo por cima (modo antigo - cabe bem e não precisa rolar). Acima disso, a pauta
+ * rola sob a linha fixa (`<app-drum-sheet [roll]>`). */
+const PAUTA_ROLA_ACIMA_DE_COMPASSOS = 2;
 
 /** Opcoes de "como se sentiu" da revisao - `feeling` e texto livre no backend, essas
  * pills so preenchem esse texto (nao ha enum travando o valor). */
@@ -97,18 +102,52 @@ export class SessionPage {
 
   protected readonly totalExercicios = computed(() => this.sessionState.exercicios().length);
 
-  /** Posicao (0..1) e step do playhead da drum sheet no exercicio `TOCA_JUNTO` atual -
-   * alimentados por um loop `requestAnimationFrame` (ver `startPlayheadLoop`) que le o
-   * relogio continuo do metronomo (`temposDecorridosNoLoop`). `0` / `null` quando nao ha
-   * padrao rodando. */
-  protected readonly playheadPos = signal(0);
-  protected readonly playheadStep = signal<number | null>(null);
+  /** Tempos (beats) decorridos no loop continuo do exercicio `TOCA_JUNTO` atual -
+   * alimenta a pauta (rolagem no modo rolante, playhead no modo fixo). Atualizado a cada
+   * frame por um loop `requestAnimationFrame` (ver `startPautaLoop`) que le o relogio
+   * continuo do metronomo (`temposDecorridosNoLoop`). Fica em `0` durante o count-in e
+   * quando nao ha padrao rodando. */
+  protected readonly elapsedBeats = signal(0);
 
-  /** Handle do rAF do playhead - `null` quando parado. */
-  private playheadRaf: number | null = null;
+  /** Handle do rAF da pauta - `null` quando parado. */
+  private pautaRaf: number | null = null;
+
+  /** Descricao ("como executar") expandida - por padrao fica truncada em 1 linha pra
+   * sobrar espaco pra pauta; tecla `D` alterna. */
+  protected readonly descExpanded = signal(false);
+
+  /** `true` quando a pauta do exercicio atual ROLA (padrao com mais de
+   * `PAUTA_ROLA_ACIMA_DE_COMPASSOS` compassos); `false` = pauta inteira e parada, playhead
+   * correndo por cima (modo antigo, bom pra 1-2 compassos). */
+  protected readonly pautaRolando = computed(
+    () => (this.exercicioAtual()?.pattern?.bars ?? 0) > PAUTA_ROLA_ACIMA_DE_COMPASSOS,
+  );
+
+  /** Posicao (0..1) do playhead no loop - so usada no modo fixo. Derivada de
+   * `elapsedBeats` (mod tamanho do loop). */
+  protected readonly playheadPos = computed(() => {
+    const p = this.exercicioAtual()?.pattern;
+    if (!p) {
+      return 0;
+    }
+    const loopBeats = Math.max(1, Math.floor(p.bars) * Math.floor(p.timeSignature[0]));
+    return (((this.elapsedBeats() % loopBeats) + loopBeats) % loopBeats) / loopBeats;
+  });
+
+  /** Step aceso (a nota sob o playhead) no modo fixo. `null` sem padrao. */
+  protected readonly playheadStep = computed(() => {
+    const p = this.exercicioAtual()?.pattern;
+    if (!p) {
+      return null;
+    }
+    const total =
+      Math.max(1, Math.floor(p.bars) * Math.floor(p.timeSignature[0])) *
+      Math.max(1, Math.floor(p.stepsPerBeat));
+    return total > 0 ? Math.floor(this.playheadPos() * total) % total : null;
+  });
 
   /** `true` quando o exercicio atual e um `TOCA_JUNTO` com padrao tocavel - decide entre
-   * a drum sheet (com playhead) e o bloco de texto/transcricao no template. */
+   * a drum sheet (rolando) e o bloco de texto/transcricao no template. */
   protected readonly exercicioTemPattern = computed(() => {
     const ex = this.exercicioAtual();
     return ex?.kind === 'TOCA_JUNTO' && ex.pattern != null;
@@ -121,11 +160,13 @@ export class SessionPage {
     () => formatDurationLabel(this.sessionState.totalSegundos()) ?? '0 min',
   );
 
-  /** Um item por tempo do compasso (fixo em 4, ver `COMPASSO_FIXO`) - alimenta os
-   * pontinhos de pulso do metronomo, reaproveitados tanto no count-in quanto no
-   * exercicio rodando (`tocando`/`tempoAtual` cobrem os dois, ver ajuste em
-   * `MetronomeService.tocarCountIn`). */
-  protected readonly beatDots = Array.from({ length: COMPASSO_FIXO }, (_, i) => i);
+  /** Um item por tempo do compasso atual do metronomo (herdado do `pattern` do exercicio,
+   * ou o fallback quando nao ha grade) - alimenta os pontinhos de pulso, reaproveitados
+   * tanto no count-in quanto no exercicio rodando (`tocando`/`tempoAtual` cobrem os dois,
+   * ver ajuste em `MetronomeService.tocarCountIn`). */
+  protected readonly beatDots = computed(() =>
+    Array.from({ length: this.metronome.compasso() }, (_, i) => i),
+  );
 
   /** Textarea de "nota rapida" da sessao livre - `Enter` foca nela (ver
    * `onEnterLivre`/artboard `SessionModeFree`), sem depender de clique do mouse. */
@@ -140,17 +181,23 @@ export class SessionPage {
     // Cobre tanto a saida via `Escape` (que ja chama `sessionState.encerrar()`) quanto o
     // usuario navegando pra outro lugar no meio de uma sessao sem passar por `Escape`.
     this.destroyRef.onDestroy(() => this.sessionState.destruir());
-    this.destroyRef.onDestroy(() => this.stopPlayheadLoop());
+    this.destroyRef.onDestroy(() => this.stopPautaLoop());
 
-    // Liga/desliga o rAF do playhead conforme o estado da sessao e o tipo do exercicio -
-    // so roda enquanto um `TOCA_JUNTO` com padrao esta em `'running'`/`'timeUp'`.
+    // Reseta a descricao pra truncada a cada troca de exercicio.
+    effect(() => {
+      this.sessionState.indiceAtual();
+      this.descExpanded.set(false);
+    });
+
+    // Liga/desliga o rAF da rolagem da pauta conforme o estado da sessao e o tipo do
+    // exercicio - so roda enquanto um `TOCA_JUNTO` com padrao esta em `'running'`/`'timeUp'`.
     effect(() => {
       const estado = this.sessionState.estado();
       const rodando = estado === 'running' || estado === 'timeUp';
       if (rodando && this.exercicioTemPattern()) {
-        this.startPlayheadLoop();
+        this.startPautaLoop();
       } else {
-        this.stopPlayheadLoop();
+        this.stopPautaLoop();
       }
     });
 
@@ -172,47 +219,38 @@ export class SessionPage {
     this.metronome.bpm.update((v) => Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(v + delta))));
   }
 
-  /** Inicia o loop `requestAnimationFrame` que reposiciona o playhead da drum sheet a
-   * cada frame, lendo o relogio continuo do metronomo. Idempotente. */
-  private startPlayheadLoop(): void {
-    if (this.playheadRaf !== null || typeof requestAnimationFrame !== 'function') {
+  /** Inicia o loop `requestAnimationFrame` que atualiza `elapsedBeats` (rolagem da pauta)
+   * a cada frame, lendo o relogio continuo do metronomo. Idempotente. */
+  private startPautaLoop(): void {
+    if (this.pautaRaf !== null || typeof requestAnimationFrame !== 'function') {
       return;
     }
     const frame = (): void => {
-      this.atualizarPlayhead();
-      this.playheadRaf = requestAnimationFrame(frame);
+      this.atualizarPauta();
+      this.pautaRaf = requestAnimationFrame(frame);
     };
-    this.playheadRaf = requestAnimationFrame(frame);
+    this.pautaRaf = requestAnimationFrame(frame);
   }
 
-  /** Para o loop do playhead e zera a posicao - chamado ao sair de `'running'`/`'timeUp'`
-   * e no destroy. */
-  private stopPlayheadLoop(): void {
-    if (this.playheadRaf !== null) {
-      cancelAnimationFrame(this.playheadRaf);
-      this.playheadRaf = null;
+  /** Para o loop da rolagem e zera `elapsedBeats` - chamado ao sair de
+   * `'running'`/`'timeUp'` e no destroy. */
+  private stopPautaLoop(): void {
+    if (this.pautaRaf !== null) {
+      cancelAnimationFrame(this.pautaRaf);
+      this.pautaRaf = null;
     }
-    this.playheadPos.set(0);
-    this.playheadStep.set(null);
+    this.elapsedBeats.set(0);
   }
 
-  /** Um frame do playhead: `pos = (beats % loopBeats) / loopBeats`, onde `beats` vem de
-   * `MetronomeService.temposDecorridosNoLoop()` e `loopBeats = bars * numerador`. Durante
-   * o count-in (ou sem relogio) fica em 0. `highlightStep` = step atual no loop. */
-  private atualizarPlayhead(): void {
-    const pattern = this.exercicioAtual()?.pattern;
-    if (!pattern) {
-      this.playheadPos.set(0);
-      this.playheadStep.set(null);
+  /** Um frame da rolagem: `elapsedBeats` vem cru de `temposDecorridosNoLoop()` (o
+   * `<app-drum-sheet roll>` faz o modulo pelo tamanho do loop e a translacao). Durante o
+   * count-in (ou sem relogio) fica em 0 - a pauta espera parada no comeco do loop. */
+  private atualizarPauta(): void {
+    if (this.sessionState.estado() === 'countIn') {
+      this.elapsedBeats.set(0);
       return;
     }
-    const loopBeats = Math.max(1, Math.floor(pattern.bars) * Math.floor(pattern.timeSignature[0]));
-    const beats =
-      this.sessionState.estado() === 'countIn' ? 0 : this.metronome.temposDecorridosNoLoop();
-    const pos = beats == null ? 0 : (((beats % loopBeats) + loopBeats) % loopBeats) / loopBeats;
-    this.playheadPos.set(pos);
-    const total = loopBeats * Math.max(1, Math.floor(pattern.stepsPerBeat));
-    this.playheadStep.set(total > 0 ? Math.floor(pos * total) % total : null);
+    this.elapsedBeats.set(this.metronome.temposDecorridosNoLoop() ?? 0);
   }
 
   /** Nome do exercicio de um log da revisao - cruza `log.exerciseId` com a lista de
@@ -299,6 +337,7 @@ export class SessionPage {
         arrowleft: () => this.sessionState.voltarExercicio(),
         arrowup: (event) => this.adjustBpm(event.shiftKey ? BPM_STEP_SHIFT : BPM_STEP),
         arrowdown: (event) => this.adjustBpm(event.shiftKey ? -BPM_STEP_SHIFT : -BPM_STEP),
+        d: () => this.descExpanded.update((v) => !v),
         '1': () => this.selecionarSensacaoAtalho(0),
         '2': () => this.selecionarSensacaoAtalho(1),
         '3': () => this.selecionarSensacaoAtalho(2),

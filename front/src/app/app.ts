@@ -1,4 +1,5 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { KeyboardShortcutsService } from './core/keyboard-shortcuts.service';
@@ -24,7 +25,15 @@ export class App {
   private readonly shortcuts = inject(KeyboardShortcutsService);
   private readonly trainingPickerOverlay = inject(TrainingPickerOverlayService);
 
+  /** `true` na rota `/session` - o Modo Sessao e uma tela imersiva (sem o cabecalho
+   * global do app), pra sobrar `100vh` inteiros pra pauta e caber tudo sem scroll. */
+  protected readonly immersive = signal(this.isImmersiveRoute());
+
   constructor() {
+    this.router.events
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.immersive.set(this.isImmersiveRoute()));
+
     // Escopo global de navegacao - base da pilha de atalhos, registrado uma vez e nunca
     // desregistrado (vive pra sempre, junto com o app-root). `blockFallthrough: false`
     // porque e a base: nao ha nada abaixo dele na pilha pra bloquear.
@@ -48,5 +57,9 @@ export class App {
         },
       },
     });
+  }
+
+  private isImmersiveRoute(): boolean {
+    return this.router.url.split(/[?#]/)[0].startsWith('/session');
   }
 }

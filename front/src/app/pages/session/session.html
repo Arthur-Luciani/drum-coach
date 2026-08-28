@@ -95,13 +95,19 @@
     </div>
   </main>
 } @else if (trainingId() != null) {
-  <main class="session-run">
-    <div class="session-run__top">
-      <div class="session-run__top-left">
-        <span class="session-run__training">{{ trainingName() ?? ('#' + trainingId()) }}</span>
+  @let ex = exercicioAtual();
+  @let countIn = sessionState.estado() === 'countIn';
+  <main class="session-run session-run--fixed">
 
-        <div class="session-run__progress-dots" aria-hidden="true">
-          @for (ex of sessionState.exercicios(); track ex.id; let i = $index) {
+    <!-- 1 — faixa superior -->
+    <header class="sr-top">
+      <div class="sr-top__l">
+        <span class="sr-top__training">{{ trainingName() ?? ('#' + trainingId()) }}</span>
+        @if (ex) {
+          <span class="sr-top__name">{{ ex.name }}</span>
+        }
+        <div class="sr-top__dots" aria-hidden="true">
+          @for (e of sessionState.exercicios(); track e.id; let i = $index) {
             <span
               class="progress-dot"
               [class.progress-dot--done]="i < sessionState.indiceAtual()"
@@ -109,138 +115,119 @@
             ></span>
           }
         </div>
-
-        <span class="session-run__count mono">
-          exercício {{ sessionState.indiceAtual() + 1 }} de {{ totalExercicios() }}
+        <span class="sr-top__count mono">
+          {{ sessionState.indiceAtual() + 1 }} / {{ totalExercicios() }}
         </span>
       </div>
 
-      <button type="button" class="session-run__end" (click)="sair()">
+      <button type="button" class="sr-top__end" (click)="sair()">
         <span>encerrar</span>
         <app-key-cap label="Esc" />
       </button>
-    </div>
 
-    <div class="session-run__center">
-      @if (sessionState.estado() === 'countIn') {
-        <span class="session-run__eyebrow mono">
-          PREPARANDO — {{ (exercicioAtual()?.name ?? '').toUpperCase() }}
-        </span>
-
-        <div class="beat-row" aria-hidden="true">
-          @for (i of beatDots; track i) {
-            <span
-              class="beat-dot"
-              [class.beat-dot--first]="i === 0"
-              [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
-            ></span>
-          }
-        </div>
-
-        <p class="session-run__prep-hint muted">
-          um compasso pra se posicionar — o metrônomo já está no andamento certo
+      @if (ex?.howToExecute && exercicioTemPattern()) {
+        <p class="sr-desc" [class.sr-desc--open]="descExpanded() || countIn">
+          <span class="sr-desc__text">{{ ex?.howToExecute }}</span>
+          <button type="button" class="sr-desc__toggle" (click)="descExpanded.set(!descExpanded())">
+            <app-key-cap label="D" />
+            <span>{{ descExpanded() ? 'recolher' : 'expandir' }}</span>
+          </button>
         </p>
-      } @else if (
-        (sessionState.estado() === 'running' || sessionState.estado() === 'timeUp') && exercicioAtual();
-        as exercicio
-      ) {
-        <div class="session-run__heading">
-          <h1>{{ exercicio.name }}</h1>
-          @if (exercicio.howToExecute) {
-            <p class="session-run__description">{{ exercicio.howToExecute }}</p>
-          }
-        </div>
+      }
+    </header>
 
-        @if (exercicioTemPattern() && exercicio.pattern) {
+    <!-- 2 — palco (pauta rolante / count-in / transcrição) -->
+    <section class="sr-stage">
+      @if (countIn) {
+        <div class="sr-prep">
+          <span class="sr-prep__eyebrow mono">PREPARANDO — {{ (ex?.name ?? '').toUpperCase() }}</span>
+          <p class="sr-prep__hint muted">
+            um compasso pra se posicionar — o metrônomo já está no andamento certo
+          </p>
+        </div>
+      } @else if (ex) {
+        @if (exercicioTemPattern() && ex.pattern) {
           <app-drum-sheet
-            style="display: block; width: 100%; max-width: 640px"
-            [pattern]="exercicio.pattern"
+            class="sr-sheet"
+            [class.sr-sheet--fit]="!pautaRolando()"
+            [roll]="pautaRolando()"
+            [pattern]="ex.pattern"
+            [elapsedBeats]="elapsedBeats()"
             [playheadPos]="playheadPos()"
             [highlightStep]="playheadStep()"
           />
-        } @else if (exercicio.kind === 'TRANSCRICAO' && exercicio.passages.length) {
-          <ul class="mono" style="list-style: none; margin: 0; padding: 0; font-size: 0.8rem">
-            @for (trecho of exercicio.passages; track trecho.id) {
-              <li>
-                <span>{{ formatClock(trecho.fromSeconds)
-                  }}@if (trecho.toSeconds != null) {–{{ formatClock(trecho.toSeconds) }}}</span>
-                @if (trecho.label) {
-                  <span class="muted" style="margin-left: 0.6rem">{{ trecho.label }}</span>
+        } @else {
+          <!-- sem pauta (transcrição / trabalho de ouvido): a descrição toma o palco -->
+          <div class="sr-earwork">
+            @if (ex.howToExecute) {
+              <p class="sr-earwork__text">{{ ex.howToExecute }}</p>
+            }
+            @if (ex.passages.length) {
+              <ul class="sr-passages mono">
+                @for (trecho of ex.passages; track trecho.id) {
+                  <li>
+                    <span>{{ formatClock(trecho.fromSeconds)
+                      }}@if (trecho.toSeconds != null) {–{{ formatClock(trecho.toSeconds) }}}</span>
+                    @if (trecho.label) {
+                      <span class="muted">{{ trecho.label }}</span>
+                    }
+                  </li>
                 }
-              </li>
-            }
-          </ul>
-        }
-
-        @if (sessionState.estado() === 'timeUp') {
-          <div class="time-up-badge">
-            <span class="time-up-badge__dot" aria-hidden="true"></span>
-            <span class="mono">{{ formatClock(exercicio.targetDurationSeconds ?? 0) }} — tempo previsto cumprido</span>
-          </div>
-        }
-
-        <div class="session-run__timer-row">
-          <span class="mono session-run__timer-elapsed">{{ formatClock(sessionState.segundosDecorridos()) }}</span>
-          @if (exercicio.targetDurationSeconds; as alvo) {
-            <span class="mono session-run__timer-target">/ {{ formatClock(alvo) }} previstos</span>
-          }
-        </div>
-
-        <div class="session-run__bpm-row">
-          <span class="mono session-run__bpm-value">{{ metronome.bpm() }}</span>
-          <div class="session-run__bpm-caption">
-            <span class="session-run__bpm-label">BPM</span>
-            @if (exercicio.targetBpm; as alvo) {
-              <span class="mono session-run__bpm-target">alvo {{ alvo }}</span>
+              </ul>
             }
           </div>
-        </div>
+        }
+      }
+    </section>
 
-        <div class="beat-row" aria-hidden="true">
-          @for (i of beatDots; track i) {
-            <span
-              class="beat-dot"
-              [class.beat-dot--first]="i === 0"
-              [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
-            ></span>
+    <!-- 3 — leitura -->
+    <div class="sr-read">
+      <div class="sr-bpm">
+        <span class="mono sr-bpm__value">{{ metronome.bpm() }}</span>
+        <span class="sr-bpm__cap">
+          <span class="sr-bpm__label">BPM</span>
+          @if (ex?.targetBpm; as alvo) {
+            <span class="mono sr-bpm__target">alvo {{ alvo }}</span>
           }
-        </div>
+        </span>
+      </div>
+
+      <div class="sr-clock mono">
+        <span class="sr-clock__elapsed">{{ formatClock(sessionState.segundosDecorridos()) }}</span>
+        @if (ex?.targetDurationSeconds; as alvo) {
+          <span class="sr-clock__target">/ {{ formatClock(alvo) }}</span>
+        }
+      </div>
+
+      <div class="beat-row" aria-hidden="true">
+        @for (i of beatDots(); track i) {
+          <span
+            class="beat-dot"
+            [class.beat-dot--first]="i === 0"
+            [class.beat-dot--active]="metronome.tocando() && metronome.tempoAtual() === i"
+          ></span>
+        }
+      </div>
+
+      @if (sessionState.estado() === 'timeUp') {
+        <span class="time-up-chip mono">
+          <span class="time-up-chip__dot" aria-hidden="true"></span>
+          tempo previsto cumprido
+        </span>
       }
     </div>
 
-    @if (
-      sessionState.estado() === 'countIn' || sessionState.estado() === 'running' || sessionState.estado() === 'timeUp'
-    ) {
-      <div class="session-run__hints">
-        <div class="session-run__hint">
-          <app-key-cap label="Espaço" />
-          <span>metrônomo</span>
-        </div>
-        <div class="session-run__hint">
-          <app-key-cap label="← →" />
-          <span>exercício</span>
-        </div>
-        <div class="session-run__hint">
-          <app-key-cap label="↑ ↓" />
-          <span>bpm</span>
-        </div>
-        <div class="session-run__hint">
-          <app-key-cap label="Enter" />
-          <span>confirmar</span>
-        </div>
-        <div class="session-run__hint">
-          <app-key-cap label="Esc" />
-          <span>encerrar</span>
-        </div>
-      </div>
-    } @else {
-      <div class="session-run__hints">
-        <div class="session-run__hint">
-          <app-key-cap label="Esc" />
-          <span>voltar ao início</span>
-        </div>
-      </div>
-    }
+    <!-- 4 — rodapé fixo -->
+    <footer class="sr-foot">
+      <span class="sr-hint"><app-key-cap label="Espaço" /> metrônomo</span>
+      <span class="sr-hint"><app-key-cap label="← →" /> exercício</span>
+      <span class="sr-hint"><app-key-cap label="↑ ↓" /> bpm</span>
+      @if (exercicioTemPattern()) {
+        <span class="sr-hint"><app-key-cap label="D" /> descrição</span>
+      }
+      <span class="sr-hint"><app-key-cap label="Enter" /> confirmar</span>
+      <span class="sr-hint"><app-key-cap label="Esc" /> encerrar</span>
+    </footer>
   </main>
 } @else {
   <main class="session-run session-free">
@@ -268,7 +255,7 @@
       </div>
 
       <div class="beat-row" aria-hidden="true">
-        @for (i of beatDots; track i) {
+        @for (i of beatDots(); track i) {
           <span
             class="beat-dot"
             [class.beat-dot--first]="i === 0"

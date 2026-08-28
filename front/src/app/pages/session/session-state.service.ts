@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 
-import { MetronomeService } from '../../core/metronome.service';
+import { MetronomeService, subdivisaoDoPattern } from '../../core/metronome.service';
 import { CreateExecutionRequest, ExecutionExerciseLogRequest, Exercise } from '../../models';
 
 /**
@@ -20,10 +20,11 @@ export type SessaoEstado = 'idle' | 'countIn' | 'running' | 'timeUp' | 'reviewin
  * sessao por falta de um numero, 100 e um andamento neutro de aquecimento. */
 const BPM_FALLBACK = 100;
 
-/** Nao existe campo de compasso por exercicio/treino no dominio - todo count-in e todo
- * metronomo embutido do Modo Sessao usa compasso 4/4 fixo. Exportado pra `SessionPage`
- * desenhar os pontinhos de pulso com o mesmo numero de tempos, sem duplicar o valor. */
-export const COMPASSO_FIXO = 4;
+/** Compasso do count-in/metronomo do Modo Sessao quando o exercicio nao tem um `pattern`
+ * de onde herdar a formula de compasso (`TRANSCRICAO`, ou `TOCA_JUNTO` ainda sem grade).
+ * Exercicio com `pattern` usa `pattern.timeSignature[0]`. Exportado so pros testes -
+ * `SessionPage` desenha os pontinhos de pulso a partir de `metronome.compasso()`. */
+export const COMPASSO_FALLBACK = 4;
 
 /**
  * Maquina de estados do Modo Sessao (ver plano Woodshed, decisao de arquitetura #5).
@@ -224,9 +225,10 @@ export class SessionStateService {
     this.pararExecucaoAtual();
   }
 
-  /** Dispara o count-in do exercicio em `indiceAtual`, e ao resolver encadeia o loop
-   * continuo do metronomo + o cronometro de 1s. Privado - so mexe no exercicio "atual"
-   * (indice ja deve estar correto antes de chamar). */
+  /** Prepara o exercicio em `indiceAtual`. `TOCA_JUNTO`: count-in do metronomo -> loop
+   * continuo + cronometro. `TRANSCRICAO` (trabalho de ouvido): sem count-in nem metronomo -
+   * vai direto pro cronometro (o usuario liga o metronomo na mao, `Espaco`, se quiser).
+   * Privado - so mexe no exercicio "atual" (indice ja deve estar correto antes de chamar). */
   private iniciarExercicioAtual(): void {
     const exercicio = this.exerciciosSignal()[this.indiceAtualSignal()];
     if (!exercicio) {
@@ -234,13 +236,48 @@ export class SessionStateService {
     }
 
     const token = ++this.execucaoToken;
-    const bpmAlvo = exercicio.targetBpm ?? BPM_FALLBACK;
-
-    this.estadoSignal.set('countIn');
     this.segundosDecorridosSignal.set(0);
     this.avisoTocadoSignal.set(false);
 
-    void this.metronome.tocarCountIn(bpmAlvo, COMPASSO_FIXO).then(() => {
+    if (exercicio.kind === 'TRANSCRICAO') {
+      // Nada de count-in nem clique: transcricao e ouvir uma gravacao e marcar trechos,
+      // nao tocar pra um metronomo. Vai direto pro cronometro. Deixa o BPM no andamento
+      // alvo pra, SE o usuario ligar o metronomo na mao (`Espaco`), ja sair no tempo certo.
+      this.metronome.parar();
+      if (exercicio.targetBpm != null) {
+        this.metronome.bpm.set(exercicio.targetBpm);
+      }
+      this.estadoSignal.set('running');
+      this.iniciarCronometro(exercicio);
+      return;
+    }
+
+    const bpmAlvo = exercicio.targetBpm ?? BPM_FALLBACK;
+
+    // O metronomo do exercicio herda a formula de compasso e a subdivisao da grade do
+    // proprio `pattern`: um exercicio escrito em tercinas ganha clique em tercinas, nao em
+    // seminimas. Sem pattern (`TOCA_JUNTO` ainda sem grade): compasso de fallback e clique
+    // no pulso. So define o PONTO DE PARTIDA por exercicio - o usuario ainda pode trocar a
+    // subdivisao no meio pelo overlay do metronomo.
+    const pattern = exercicio.pattern;
+    const compassoAlvo = pattern
+      ? Math.max(1, Math.floor(pattern.timeSignature[0]))
+      : COMPASSO_FALLBACK;
+    this.metronome.subdivisao.set(
+      pattern
+        ? subdivisaoDoPattern(
+            pattern.stepsPerBeat,
+            pattern.tuplet,
+            Object.values(pattern.hits)
+              .flat()
+              .filter((n): n is number => Number.isFinite(n)),
+          )
+        : 'quarter',
+    );
+
+    this.estadoSignal.set('countIn');
+
+    void this.metronome.tocarCountIn(bpmAlvo, compassoAlvo).then(() => {
       if (token !== this.execucaoToken) {
         // Uma nova execucao (avancar/voltar/encerrar/destruir) ja substituiu esta. O loop
         // continuo que este count-in encadeou por baixo (ver `MetronomeService.
@@ -251,22 +288,24 @@ export class SessionStateService {
       }
       this.segundosDecorridosSignal.set(0);
       this.estadoSignal.set('running');
-      this.cronometroHandle = setInterval(() => {
-        this.segundosDecorridosSignal.update((v) => v + 1);
-
-        // Aviso de "tempo previsto cumprido" (Fase 3e-2) - so dispara na TRANSICAO pro
-        // limiar (guardado por `avisoTocadoSignal`), nunca de novo a cada tick depois
-        // disso. Nao forca avanco: so sinaliza (estado + som avulso), o cronometro e o
-        // metronomo continuam normalmente, `confirmarEAvancar`/`voltarExercicio`/
-        // `alternarMetronomo` tratam `'timeUp'` igual a `'running'`.
-        const alvo = exercicio.targetDurationSeconds;
-        if (alvo != null && this.segundosDecorridosSignal() >= alvo && !this.avisoTocadoSignal()) {
-          this.avisoTocadoSignal.set(true);
-          this.estadoSignal.set('timeUp');
-          this.metronome.avisoTempoCumprido();
-        }
-      }, 1000);
+      this.iniciarCronometro(exercicio);
     });
+  }
+
+  /** Liga o cronometro de 1s do exercicio atual: conta `segundosDecorridos` e, ao cruzar
+   * `targetDurationSeconds`, dispara UMA vez o aviso de "tempo previsto cumprido"
+   * (estado + som avulso, sem forcar avanco). */
+  private iniciarCronometro(exercicio: Exercise): void {
+    this.cronometroHandle = setInterval(() => {
+      this.segundosDecorridosSignal.update((v) => v + 1);
+
+      const alvo = exercicio.targetDurationSeconds;
+      if (alvo != null && this.segundosDecorridosSignal() >= alvo && !this.avisoTocadoSignal()) {
+        this.avisoTocadoSignal.set(true);
+        this.estadoSignal.set('timeUp');
+        this.metronome.avisoTempoCumprido();
+      }
+    }, 1000);
   }
 
   /** Para o cronometro (se rodando) e o metronomo, e invalida qualquer `tocarCountIn`

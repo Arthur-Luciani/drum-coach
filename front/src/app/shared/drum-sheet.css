@@ -10,11 +10,32 @@
   overflow: hidden;
 }
 
+/* Modo rolando (Modo Sessao): a propria faixa da tela ja e a moldura - a pauta se funde
+   nela, sem card/borda/recorte proprio. */
+.drum-sheet.roll {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
 .drum-sheet svg {
   display: block;
   width: 100%;
   height: auto;
   overflow: visible;
+}
+
+/* Modo rolando: o SVG e a JANELA - recorta no viewBox (N compassos fixos) em vez de
+   deixar as copias do loop transbordarem pela tela toda. */
+.drum-sheet.roll svg {
+  overflow: hidden;
+}
+
+/* Faixa da linha "agora" no modo rolando - eco discreto do acento sob a linha. */
+.now-band {
+  fill: var(--color-accent);
+  opacity: 0.1;
 }
 
 .stafflines {

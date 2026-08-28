@@ -35,6 +35,7 @@ export class MetronomeOverlay {
     { value: 'quarter', label: '♩', title: 'Semínima - 1 clique por tempo' },
     { value: 'eighth', label: '♫', title: 'Colcheia - 2 cliques por tempo' },
     { value: 'triplet', label: '3', title: 'Tercina - 3 cliques por tempo' },
+    { value: 'sixteenth', label: '♬', title: 'Semicolcheia - 4 cliques por tempo' },
   ];
 
   protected readonly compassoOptions = [2, 3, 4, 5, 6, 7, 8, 9];

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MetronomeService } from '../../core/metronome.service';
+import { MetronomeService, Subdivisao } from '../../core/metronome.service';
 import { Exercise } from '../../models';
 import { SessionStateService } from './session-state.service';
 
@@ -21,6 +21,7 @@ import { SessionStateService } from './session-state.service';
 class FakeMetronomeService {
   readonly bpm = signal(100);
   readonly compasso = signal(4);
+  readonly subdivisao = signal<Subdivisao>('quarter');
 
   readonly tocarCountInCalls: Array<{ bpm: number; compasso: number }> = [];
   iniciarCalls = 0;
@@ -206,6 +207,141 @@ describe('SessionStateService', () => {
     await flush();
     service.alternarMetronomo();
     expect(metronome.alternarCalls).toBe(2);
+  });
+
+  describe('metronomo herda a grade do pattern do exercicio', () => {
+    it('exercicio com pattern: count-in usa o compasso do pattern e a subdivisao e derivada da grade', async () => {
+      const ex = criarExercicio({
+        id: 1,
+        targetBpm: 100,
+        pattern: {
+          version: 1,
+          timeSignature: [3, 4],
+          stepsPerBeat: 3,
+          tuplet: true,
+          bars: 1,
+          voices: ['snare'],
+          hits: { snare: [0, 1, 2] },
+        },
+      });
+
+      service.iniciar([ex]);
+      await flush();
+
+      expect(metronome.tocarCountInCalls).toEqual([{ bpm: 100, compasso: 3 }]);
+      expect(metronome.subdivisao()).toBe('triplet');
+    });
+
+    it('grade de semicolcheia com notas so em colcheias: clique em colcheia (bug "Banco de viradas")', async () => {
+      const ex = criarExercicio({
+        id: 1,
+        targetBpm: 75,
+        pattern: {
+          version: 1,
+          timeSignature: [4, 4],
+          stepsPerBeat: 4, // grade de 16, mas...
+          tuplet: false,
+          bars: 4,
+          voices: ['hihat', 'snare', 'kick'],
+          hits: {
+            hihat: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22], // ...tudo em indice par
+            snare: [4, 12, 20, 28, 48, 50],
+            kick: [0, 8, 16, 24, 32, 40],
+          },
+        },
+      });
+
+      service.iniciar([ex]);
+      await flush();
+
+      expect(metronome.subdivisao()).toBe('eighth');
+    });
+
+    it('exercicio sem pattern: compasso de fallback (4) e clique volta pro pulso (limpa resquicio)', async () => {
+      metronome.subdivisao.set('triplet'); // resquicio de um exercicio anterior no singleton
+      const ex = criarExercicio({ id: 1, targetBpm: 90, pattern: null });
+
+      service.iniciar([ex]);
+      await flush();
+
+      expect(metronome.tocarCountInCalls).toEqual([{ bpm: 90, compasso: 4 }]);
+      expect(metronome.subdivisao()).toBe('quarter');
+    });
+
+    it('cada exercicio re-deriva a grade ao entrar (colcheias -> semicolcheias)', async () => {
+      const colcheias = criarExercicio({
+        id: 1,
+        targetBpm: 100,
+        targetDurationSeconds: null,
+        pattern: {
+          version: 1,
+          timeSignature: [4, 4],
+          stepsPerBeat: 2,
+          tuplet: false,
+          bars: 1,
+          voices: ['hihat'],
+          hits: { hihat: [0, 1, 2, 3, 4, 5, 6, 7] },
+        },
+      });
+      const semicolcheias = criarExercicio({
+        id: 2,
+        targetBpm: 80,
+        pattern: {
+          version: 1,
+          timeSignature: [4, 4],
+          stepsPerBeat: 4,
+          tuplet: false,
+          bars: 1,
+          voices: ['snare'],
+          hits: { snare: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] },
+        },
+      });
+
+      service.iniciar([colcheias, semicolcheias]);
+      await flush();
+      expect(metronome.subdivisao()).toBe('eighth');
+
+      service.confirmarEAvancar();
+      await flush();
+      expect(metronome.subdivisao()).toBe('sixteenth');
+      expect(metronome.tocarCountInCalls).toEqual([
+        { bpm: 100, compasso: 4 },
+        { bpm: 80, compasso: 4 },
+      ]);
+    });
+  });
+
+  describe('exercício TRANSCRICAO (trabalho de ouvido)', () => {
+    it('sem count-in nem metrônomo: vai direto pro cronômetro', async () => {
+      const ex = criarExercicio({ id: 1, kind: 'TRANSCRICAO', targetDurationSeconds: 3 });
+
+      service.iniciar([ex]);
+
+      // nada de 'countIn' - ja entra rodando, sem tocar count-in, e para o metronomo
+      expect(service.estado()).toBe('running');
+      expect(metronome.tocarCountInCalls).toEqual([]);
+      expect(metronome.pararCalls).toBeGreaterThan(0);
+
+      // o cronometro roda e o aviso de tempo cumprido ainda dispara ao cruzar o alvo
+      await flush(3000);
+      expect(service.segundosDecorridos()).toBe(3);
+      expect(service.estado()).toBe('timeUp');
+      expect(metronome.avisoTempoCumpridoCalls).toBe(1);
+    });
+
+    it('misturado com TOCA_JUNTO: só o TOCA_JUNTO tem count-in', async () => {
+      const transcricao = criarExercicio({ id: 1, kind: 'TRANSCRICAO', targetDurationSeconds: null });
+      const tocaJunto = criarExercicio({ id: 2, targetBpm: 90, targetDurationSeconds: null });
+
+      service.iniciar([transcricao, tocaJunto]);
+      expect(service.estado()).toBe('running');
+
+      service.confirmarEAvancar();
+      expect(service.estado()).toBe('countIn');
+      await flush();
+      expect(service.estado()).toBe('running');
+      expect(metronome.tocarCountInCalls).toEqual([{ bpm: 90, compasso: 4 }]);
+    });
   });
 
   describe('sessão livre (Fase 3e-3, sem treino/exercícios)', () => {
