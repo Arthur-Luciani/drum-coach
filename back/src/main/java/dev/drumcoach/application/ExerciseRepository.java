@@ -34,4 +34,13 @@ public interface ExerciseRepository {
 	 * se o trecho nao existir ou nao pertencer ao exercicio informado.
 	 */
 	void deletePassage(long exerciseId, long passageId);
+
+	/** Remove o exercicio e seus {@link ExercisePassage} em cascata (filho-primeiro). */
+	void deleteById(long id);
+
+	/**
+	 * Remove todos os exercicios de um treino e seus {@link ExercisePassage} em cascata
+	 * (filho-primeiro), numa unica transacao.
+	 */
+	void deleteByTrainingId(long trainingId);
 }

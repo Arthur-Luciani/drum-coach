@@ -86,16 +86,25 @@ public final class Exercise {
 	}
 
 	/**
-	 * Aplica uma atualizacao parcial (PATCH) de {@code pattern} e/ou {@code howToExecute}:
-	 * um parametro {@code null} mantem o valor atual. {@code kind} nunca muda aqui (e
-	 * imutavel - ver {@code UpdateExerciseUseCase}). Retorna uma nova instancia (sem
-	 * mutacao) com auditoria atualizada.
+	 * Aplica uma atualizacao parcial (PATCH) de qualquer campo editavel do exercicio: cada
+	 * parametro {@code null} mantem o valor atual. {@code kind} nunca muda aqui (e imutavel
+	 * - ver {@code UpdateExerciseUseCase}); {@code newPattern}, quando presente, ja deve vir
+	 * validado/canonico (ver {@code application.DrumPattern}). Retorna uma nova instancia
+	 * (sem mutacao) com auditoria atualizada.
 	 */
-	public Exercise withPatternAndNotes(String newPattern, String newHowToExecute, Origin editor, Instant now) {
-		return new Exercise(id, trainingId, name, exerciseType, kind,
+	public Exercise withUpdated(String newName, String newExerciseType, String newHowToExecute, String newPattern,
+			Integer newTargetBpm, Integer newTargetDurationSeconds, VideoSourceType newVideoSourceType,
+			String newVideoUrl, String newVideoFilePath, Integer newOrderIndex, Origin editor, Instant now) {
+		return new Exercise(id, trainingId, newName != null ? newName : this.name,
+				newExerciseType != null ? newExerciseType : this.exerciseType, kind,
 				newHowToExecute != null ? newHowToExecute : this.howToExecute,
-				newPattern != null ? newPattern : this.pattern, targetBpm, targetDurationSeconds, videoSourceType,
-				videoUrl, videoFilePath, orderIndex, createdBy, editor, createdAt, now);
+				newPattern != null ? newPattern : this.pattern,
+				newTargetBpm != null ? newTargetBpm : this.targetBpm,
+				newTargetDurationSeconds != null ? newTargetDurationSeconds : this.targetDurationSeconds,
+				newVideoSourceType != null ? newVideoSourceType : this.videoSourceType,
+				newVideoUrl != null ? newVideoUrl : this.videoUrl,
+				newVideoFilePath != null ? newVideoFilePath : this.videoFilePath,
+				newOrderIndex != null ? newOrderIndex : this.orderIndex, createdBy, editor, createdAt, now);
 	}
 
 	public Long id() {

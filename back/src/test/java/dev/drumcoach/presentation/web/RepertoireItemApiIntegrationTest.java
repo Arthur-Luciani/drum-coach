@@ -88,5 +88,15 @@ class RepertoireItemApiIntegrationTest {
 		assertThat(updatedLinks).extracting(link -> link.get("url"))
 			.contains("https://youtube.com/example1", "https://example.com/sheet.pdf",
 					"https://example.com/backing-track.mp3");
+
+		// Fase 5: POST aceita 'status' e ja devolve o item nesse estado (sem PATCH depois).
+		Map<String, Object> learning = client.post()
+			.uri("/api/repertoire-items")
+			.body(Map.of("songTitle", "YYZ", "artist", "Rush", "status", "LEARNING"))
+			.retrieve()
+			.body(new ParameterizedTypeReference<Map<String, Object>>() {
+			});
+		assertThat(learning).isNotNull();
+		assertThat(learning.get("status")).isEqualTo("LEARNING");
 	}
 }

@@ -66,19 +66,22 @@ mvn test
 
 Roda `McpProxyStdioTest`: sobe `McpProxyApplication` como subprocesso real (fala o
 protocolo MCP de verdade via stdio, usando o `McpSyncClient` do proprio SDK) e verifica
-`initialize`, que `tools/list` retorna as 25 tools esperadas (Fase 3 - Treino direto na
+`initialize`, que `tools/list` retorna as 28 tools esperadas (Fase 3 - Treino direto na
 Meta, sem Plano, ver [ADR-0009](../docs/adr/0009-treino-direto-na-meta-sem-plano.md); Fase
 4b - eixo `kind` + `pattern` tocavel, ver
-[ADR-0011](../docs/adr/0011-tipos-de-exercicio-e-drum-sheet-engine.md)), que nenhuma tool
+[ADR-0011](../docs/adr/0011-tipos-de-exercicio-e-drum-sheet-engine.md); Fase 5 -
+`update_exercise_pattern` vira `update_exercise` e entram `delete_exercise`,
+`update_training`, `delete_training`), que nenhuma tool
 baseada em Plano (`list_active_plans`, `get_plan_details`, `create_plan`,
 `add_training_to_plan`, `generate_plan_from_lesson`) sobreviveu no `tools/list`, que
 `health_check` responde de forma amigavel (sem derrubar o processo) quando o `back` esta
 fora do ar, que tools com parametro obrigatorio faltando (inclusive campos aninhados,
-ex. `training.targetDurationMinutes` em `add_training_to_goal`, `pattern` em
-`update_exercise_pattern`) retornam erro amigavel em vez de derrubar o processo, que o
-`inputSchema` das tools novas expoe os campos obrigatorios certos (e que o exercicio
-inline passou a exigir `kind` e nao mais `howToExecute`), e que `list_pattern_presets`
-devolve os 3 presets embutidos sem precisar do `back`. **Nao precisa do `back` rodando.**
+ex. `training.targetDurationMinutes` em `add_training_to_goal`, `exerciseId` em
+`update_exercise`) retornam erro amigavel em vez de derrubar o processo, que o
+`inputSchema` das tools novas expoe os campos obrigatorios/editaveis certos (e que o
+exercicio inline passou a exigir `kind` e nao mais `howToExecute`), e que
+`list_pattern_presets` devolve os 3 presets embutidos sem precisar do `back`. **Nao
+precisa do `back` rodando.**
 
 Existe tambem `BackendIT` - testes que precisam de um `back` de verdade no ar: cria uma
 Goal via `create_goal` e confere `createdBy=CLAUDE`; `update_goal_progress` muda
@@ -90,11 +93,14 @@ atomicamente qualquer outra meta que estivesse em foco; `record_execution` persi
 `lesson.generatedTrainingId`; `get_coach_briefing` retorna um resumo coerente (sem
 mencionar "planos"); `add_repertoire_item`/`update_repertoire_item` fecham o ciclo do
 repertorio. Fase 4b: `add_exercise_to_training` cria um exercicio `TOCA_JUNTO` com um
-`pattern` de preset e `get_exercise` devolve esse pattern; `update_exercise_pattern`
+`pattern` de preset e `get_exercise` devolve esse pattern; `update_exercise`
 substitui o pattern por um editado (e propaga o 400 do back quando o documento e
 invalido); `add_marked_passage` grava um trecho num exercicio `TRANSCRICAO` que reaparece
 em `get_exercise`; `list_pattern_presets` retorna os 3 presets e cada um passa na
-validacao do `DrumPattern` do back. Confere tudo batendo direto na API REST do back (sem
+validacao do `DrumPattern` do back. Fase 5: `update_training` altera um campo de um
+treino; `delete_training` remove um treino novo vazio; `update_exercise` muda o `name` de
+um exercicio; `delete_exercise` remove um exercicio; `add_repertoire_item` com `status`
+cria o item ja no estado certo. Confere tudo batendo direto na API REST do back (sem
 passar pelo proxy), para validar a auditoria e o estado persistido de forma independente.
 Ele **nao roda** em
 `mvn test`/`mvn clean package` (o nome termina em `IT`, fora do padrao default do
@@ -151,7 +157,7 @@ temporario depois.
    estiver rodando em outra porta/host. Sem ela, o proxy ja usa
    `http://localhost:8080` por padrao.)
 
-4. Reinicie o Claude Desktop. As 25 tools listadas abaixo devem aparecer disponiveis numa
+4. Reinicie o Claude Desktop. As 28 tools listadas abaixo devem aparecer disponiveis numa
    conversa. **Sempre que a lista de tools mudar (ex.: apos esta fase), reinicie o Claude
    Desktop de novo - ele so le o `tools/list` no start.**
 
@@ -179,6 +185,14 @@ virou opcional. Quatro tools novas: `get_exercise` e `list_pattern_presets` (lei
 `add_exercise_to_training` / `add_training_to_goal` / `generate_training_from_lesson`
 passaram a exigir `kind` e a aceitar `pattern` opcional.
 
+Fase 5: fechadas as lacunas de CRUD. `update_exercise_pattern` foi substituida por
+**`update_exercise`** (edita qualquer campo de um exercicio - `name`, `exerciseType`,
+`howToExecute`, `targetBpm`, `targetDurationSeconds`, `orderIndex` e/ou o `pattern`
+inteiro; `kind` continua imutavel). Tres tools novas: **`delete_exercise`**,
+**`update_training`** e **`delete_training`**. Os dois deletes propagam **409** do back
+quando ha execucao registrada vinculada (ao treino) ou execucao com log (do exercicio).
+`add_repertoire_item` passou a aceitar `status` opcional.
+
 Todas as chamadas de escrita enviam o header `X-Drum-Coach-Actor: CLAUDE`, para que o
 `back` marque `createdBy`/`lastModifiedBy` como `CLAUDE` (ver ADR-0007). Duas tools sao
 **compostas** (varias chamadas HTTP sequenciais no proprio proxy, sem endpoint composto
@@ -201,7 +215,7 @@ abaixo.
   (`GET /api/exercises/{id}`), formatado: `kind`, `exerciseType`, `howToExecute`, BPM/
   duracao alvo, o `pattern` completo em JSON (quando `TOCA_JUNTO`) e os trechos marcados
   (quando `TRANSCRICAO`). E a leitura do fluxo de edicao de pattern:
-  `get_exercise` -> editar o JSON -> `update_exercise_pattern`.
+  `get_exercise` -> editar o JSON -> `update_exercise`.
 - **`list_pattern_presets`** - sem parametros. Pontos de partida nomeados para o `pattern`
   de um exercicio `TOCA_JUNTO` (`groove-4-4`, `paradiddle`, `shuffle`) - cada um com nome,
   descricao e o objeto JSON ja valido. Sem endpoint no back: os presets sao embutidos no
@@ -238,16 +252,27 @@ abaixo.
   treino (`POST /api/trainings`) e, se `training.exercises` foi passado, cada exercicio
   (`POST /api/trainings/{id}/exercises`) em sequencia. Falhas parciais num exercicio nao
   interrompem o resto - viram avisos na resposta.
+- **`update_training`** - `trainingId` (obrigatorio), `name`/`description`/
+  `targetDurationMinutes`/`targetRepetitions`/`goalId`/`orderIndex` (opcionais - mantem o
+  atual se omitido). `PATCH /api/trainings/{id}`. 404 se o id nao existir.
+- **`delete_training`** - `trainingId` (obrigatorio). Remove o treino e, em cascata, seus
+  exercicios e trechos marcados - `DELETE /api/trainings/{id}`. **409** (propagado como
+  erro da tool) se houver execucoes registradas vinculadas ao treino; 404 se o id nao
+  existir.
 - **`add_exercise_to_training`** - `trainingId` (obrigatorio), `exercise` (obrigatorio).
   O `exercise` exige `name`/`exerciseType`/`kind` (`TOCA_JUNTO`|`TRANSCRICAO`)/`orderIndex`
   e aceita `howToExecute` (opcional), `pattern` (objeto JSON, opcional, so em `TOCA_JUNTO`),
   `targetBpm`/`targetDurationSeconds` e os campos de video. `POST
   /api/trainings/{trainingId}/exercises`.
-- **`update_exercise_pattern`** - `exerciseId`/`pattern` (obrigatorios), `howToExecute`
-  (opcional). Substitui o `pattern` de um exercicio `TOCA_JUNTO` pelo documento JSON
-  **inteiro** (nao e diff) - `PATCH /api/exercises/{id}`. `kind` e imutavel e nao e
-  enviado. O back valida a estrutura e responde 400 (com mensagem, propagada como erro da
-  tool) se algo nao fecha. Fluxo: `get_exercise` -> editar o JSON -> esta tool.
+- **`update_exercise`** - `exerciseId` (obrigatorio); `name`/`exerciseType`/`howToExecute`/
+  `targetBpm`/`targetDurationSeconds`/`orderIndex`/`pattern` (opcionais - mantem o atual se
+  omitido). `PATCH /api/exercises/{id}`. `pattern` substitui o documento JSON **inteiro**
+  (nao e diff) e so vale em `TOCA_JUNTO`; `kind` e imutavel e nao e enviado. O back valida
+  a estrutura do pattern e responde 400 (propagado como erro da tool) se algo nao fecha.
+  404 se o id nao existir. Fluxo de pattern: `get_exercise` -> editar o JSON -> esta tool.
+- **`delete_exercise`** - `exerciseId` (obrigatorio). Remove o exercicio e seus trechos
+  marcados em cascata - `DELETE /api/exercises/{id}`. **409** (propagado como erro da tool)
+  se houver execucao com log deste exercicio; 404 se o id nao existir.
 - **`add_marked_passage`** - `exerciseId`/`fromSeconds` (obrigatorios), `toSeconds`/`label`
   (opcionais). Adiciona um trecho marcado a um exercicio (tipicamente `TRANSCRICAO`) -
   `POST /api/exercises/{id}/passages`. Trecho pontual = so `fromSeconds`; intervalo =
@@ -262,7 +287,8 @@ abaixo.
   avulso), `training` (obrigatorio). Confere que a aula existe, cria o treino (igual
   `add_training_to_goal`) e vincula `lesson.generatedTrainingId` a ele via
   `PATCH /api/lessons/{id}`.
-- **`add_repertoire_item`** - `songTitle` (obrigatorio), `artist`/`targetBpm`/
+- **`add_repertoire_item`** - `songTitle` (obrigatorio), `artist`/`status`
+  (`NOT_STARTED`|`LEARNING`|`MASTERED`, default `NOT_STARTED`)/`targetBpm`/
   `currentBpm`/`notes`/`links` (opcionais). `POST /api/repertoire-items`.
 - **`update_repertoire_item`** - `id` (obrigatorio), `status`/`currentBpm`/`notes`/
   `newLinks` (opcionais - mantem o atual se omitido; `newLinks` e sempre adicionado, nunca
@@ -310,9 +336,9 @@ Forma do **`pattern`** (objeto JSON, so em `TOCA_JUNTO`):
 
 Fluxo de autoria/ajuste: `list_pattern_presets()` (base pronta) -> `add_exercise_to_training`
 ou, para editar um existente, `get_exercise` (le o JSON atual) -> editar o **documento
-inteiro** -> `update_exercise_pattern`.
+inteiro** -> `update_exercise` (campo `pattern`).
 
-### Endpoints relevantes no back (Fase 2/3/4)
+### Endpoints relevantes no back (Fase 2/3/4/5)
 
 Endpoints adicionados/ajustados nas ultimas fases, seguindo exatamente o padrao das
 demais entidades (`application` use case + `presentation.web` controller,
@@ -327,9 +353,27 @@ demais entidades (`application` use case + `presentation.web` controller,
   aula ja existente.
 - `POST /api/trainings/{id}/exercises` - `CreateExerciseRequest` ganhou `kind` e `pattern`
   (objeto JSON); `howToExecute` virou opcional.
+- `PATCH /api/trainings/{id}` (`UpdateTrainingUseCase`) - edicao parcial de `name`/
+  `description`/`targetDurationMinutes`/`targetRepetitions`/`goalId`/`orderIndex`; 404 se
+  o id nao existir.
+- `DELETE /api/trainings/{id}` (`DeleteTrainingUseCase`) - apaga o treino e, em cascata
+  (`@Transactional`, filho-primeiro), seus exercicios e `exercise_passage`. Antes, conta
+  `execution WHERE training_id = ?`: se > 0, responde **409** (`IllegalStateException`);
+  404 se o treino nao existir.
 - `GET /api/exercises/{id}` (`GetExerciseUseCase`) - o exercicio inteiro, com `kind`,
   `pattern` (objeto) e `passages`.
-- `PATCH /api/exercises/{id}` (`UpdateExerciseUseCase`) - edita `pattern`/`howToExecute`
-  (documento inteiro); `kind` e imutavel (400 se tentar trocar).
+- `PATCH /api/exercises/{id}` (`UpdateExerciseUseCase`) - edicao parcial de qualquer campo
+  editavel (`name`, `exerciseType`, `howToExecute`, `pattern` inteiro, `targetBpm`,
+  `targetDurationSeconds`, campos de video, `orderIndex`); `kind` e imutavel (400 se
+  tentar trocar); 404 se o id nao existir.
+- `DELETE /api/exercises/{id}` (`DeleteExerciseUseCase`) - apaga o exercicio e seus
+  `exercise_passage` em cascata (`@Transactional`). Antes, conta
+  `execution_exercise_log WHERE exercise_id = ?`: se > 0, responde **409**; 404 se o
+  exercicio nao existir.
 - `POST /api/exercises/{id}/passages` (`AddMarkedPassageUseCase`) - adiciona um trecho
   marcado.
+- `POST /api/repertoire-items` - `CreateRepertoireItemRequest` ganhou `status` opcional
+  (`null` = `NOT_STARTED`).
+- `GlobalExceptionHandler` - passou a mapear `IllegalStateException` -> **409** e
+  `NoSuchElementException` -> **404** (alem do `IllegalArgumentException`/`NullPointerException`
+  -> 400 ja existentes).

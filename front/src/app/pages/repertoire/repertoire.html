@@ -55,7 +55,7 @@
             </div>
             <div class="field">
               <label>notas</label>
-              <textarea name="editNotes" [(ngModel)]="editNotes"></textarea>
+              <textarea name="editNotes" rows="6" [(ngModel)]="editNotes"></textarea>
             </div>
             @if (item.links.length > 0) {
               <div class="link-list">
@@ -105,7 +105,7 @@
         </div>
         <div class="field">
           <label for="notes">notas</label>
-          <textarea id="notes" name="notes" [(ngModel)]="newNotes"></textarea>
+          <textarea id="notes" name="notes" rows="4" [(ngModel)]="newNotes"></textarea>
         </div>
 
         <div class="field">

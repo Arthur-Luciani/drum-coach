@@ -24,6 +24,7 @@ import dev.drumcoach.application.AddMarkedPassageCommand;
 import dev.drumcoach.application.AddMarkedPassageUseCase;
 import dev.drumcoach.application.CreateExerciseCommand;
 import dev.drumcoach.application.CreateExerciseUseCase;
+import dev.drumcoach.application.DeleteExerciseUseCase;
 import dev.drumcoach.application.DeleteMarkedPassageUseCase;
 import dev.drumcoach.application.GetExerciseUseCase;
 import dev.drumcoach.application.ListExercisesByTrainingUseCase;
@@ -46,18 +47,21 @@ public class ExerciseController {
 	private final ListExercisesByTrainingUseCase listExercisesByTrainingUseCase;
 	private final GetExerciseUseCase getExerciseUseCase;
 	private final UpdateExerciseUseCase updateExerciseUseCase;
+	private final DeleteExerciseUseCase deleteExerciseUseCase;
 	private final AddMarkedPassageUseCase addMarkedPassageUseCase;
 	private final DeleteMarkedPassageUseCase deleteMarkedPassageUseCase;
 	private final ObjectMapper objectMapper;
 
 	public ExerciseController(CreateExerciseUseCase createExerciseUseCase,
 			ListExercisesByTrainingUseCase listExercisesByTrainingUseCase, GetExerciseUseCase getExerciseUseCase,
-			UpdateExerciseUseCase updateExerciseUseCase, AddMarkedPassageUseCase addMarkedPassageUseCase,
-			DeleteMarkedPassageUseCase deleteMarkedPassageUseCase, ObjectMapper objectMapper) {
+			UpdateExerciseUseCase updateExerciseUseCase, DeleteExerciseUseCase deleteExerciseUseCase,
+			AddMarkedPassageUseCase addMarkedPassageUseCase, DeleteMarkedPassageUseCase deleteMarkedPassageUseCase,
+			ObjectMapper objectMapper) {
 		this.createExerciseUseCase = createExerciseUseCase;
 		this.listExercisesByTrainingUseCase = listExercisesByTrainingUseCase;
 		this.getExerciseUseCase = getExerciseUseCase;
 		this.updateExerciseUseCase = updateExerciseUseCase;
+		this.deleteExerciseUseCase = deleteExerciseUseCase;
 		this.addMarkedPassageUseCase = addMarkedPassageUseCase;
 		this.deleteMarkedPassageUseCase = deleteMarkedPassageUseCase;
 		this.objectMapper = objectMapper;
@@ -87,9 +91,17 @@ public class ExerciseController {
 
 	@PatchMapping("/api/exercises/{id}")
 	public ExerciseResponse update(@PathVariable long id, @RequestBody UpdateExerciseRequest request) {
-		Exercise updated = updateExerciseUseCase.execute(
-				new UpdateExerciseCommand(id, request.kind(), writeJson(request.pattern()), request.howToExecute()));
+		Exercise updated = updateExerciseUseCase.execute(new UpdateExerciseCommand(id, request.kind(), request.name(),
+				request.exerciseType(), request.howToExecute(), writeJson(request.pattern()), request.targetBpm(),
+				request.targetDurationSeconds(), request.videoSourceType(), request.videoUrl(), request.videoFilePath(),
+				request.orderIndex()));
 		return ExerciseResponse.from(updated, getExerciseUseCase.execute(id).passages());
+	}
+
+	@DeleteMapping("/api/exercises/{id}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void delete(@PathVariable long id) {
+		deleteExerciseUseCase.execute(id);
 	}
 
 	@PostMapping("/api/exercises/{exerciseId}/passages")

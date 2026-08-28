@@ -26,4 +26,7 @@ public interface ExecutionRepository {
 	Optional<Execution> findById(long id);
 
 	long countByTrainingId(long trainingId);
+
+	/** Quantos {@code execution_exercise_log} referenciam o exercicio informado. */
+	long countExerciseLogsByExerciseId(long exerciseId);
 }

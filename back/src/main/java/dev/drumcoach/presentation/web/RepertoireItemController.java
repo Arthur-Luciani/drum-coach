@@ -49,8 +49,8 @@ public class RepertoireItemController {
 	public ResponseEntity<RepertoireItemResponse> create(@RequestBody CreateRepertoireItemRequest request) {
 		List<RepertoireLinkCommand> links = toLinkCommands(request.links());
 		RepertoireItem item = createRepertoireItemUseCase.execute(new CreateRepertoireItemCommand(
-				request.songTitle(), request.artist(), request.targetBpm(), request.currentBpm(), request.notes(),
-				links));
+				request.songTitle(), request.artist(), request.status(), request.targetBpm(), request.currentBpm(),
+				request.notes(), links));
 		return ResponseEntity.created(URI.create("/api/repertoire-items/" + item.id()))
 			.body(RepertoireItemResponse.from(item));
 	}

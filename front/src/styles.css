@@ -269,6 +269,7 @@ th {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
   background: oklch(0.24 0.012 55);
   color: var(--color-text-secondary);
 }
@@ -520,8 +521,16 @@ hr {
 }
 
 .star-btn {
+  /* Centraliza o SVG e forca a caixa mesmo quando o elemento e um <span> inline
+     (estrela preenchida / placeholder), nao so o <button class="icon-btn">. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
   width: 30px;
   height: 30px;
+  padding: 0;
   border-radius: 50%;
   border: 1px solid var(--color-border-strong);
   background: transparent;

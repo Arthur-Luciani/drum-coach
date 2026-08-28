@@ -58,6 +58,20 @@ public final class Training {
 				createdBy, lastModifiedBy, createdAt, updatedAt);
 	}
 
+	/**
+	 * Aplica uma atualizacao parcial (PATCH): cada parametro {@code null} mantem o valor
+	 * atual. Retorna uma nova instancia (sem mutacao) com auditoria atualizada
+	 * ({@code lastModifiedBy} = {@code editor}, {@code updatedAt} = {@code now}).
+	 */
+	public Training withUpdated(String name, String description, Integer targetDurationMinutes,
+			Integer targetRepetitions, Long goalId, Integer orderIndex, Origin editor, Instant now) {
+		return new Training(id, goalId != null ? goalId : this.goalId, name != null ? name : this.name,
+				description != null ? description : this.description,
+				targetDurationMinutes != null ? targetDurationMinutes : this.targetDurationMinutes,
+				targetRepetitions != null ? targetRepetitions : this.targetRepetitions,
+				orderIndex != null ? orderIndex : this.orderIndex, createdBy, editor, createdAt, now);
+	}
+
 	public Long id() {
 		return id;
 	}

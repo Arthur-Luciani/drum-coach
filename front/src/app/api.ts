@@ -21,6 +21,7 @@ import {
   UpdateExerciseRequest,
   UpdateGoalRequest,
   UpdateRepertoireItemRequest,
+  UpdateTrainingRequest,
 } from './models';
 
 /**
@@ -62,6 +63,17 @@ export class ApiService {
     return this.http.post<Training>('/api/trainings', request);
   }
 
+  /** Edicao parcial de um treino (campos omitidos ficam inalterados). */
+  updateTraining(id: number, request: UpdateTrainingRequest): Observable<Training> {
+    return this.http.patch<Training>(`/api/trainings/${id}`, request);
+  }
+
+  /** Apaga o treino e, em cascata, seus exercicios/trechos. Responde 409 se houver
+   * execucoes registradas neste treino. */
+  deleteTraining(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/trainings/${id}`);
+  }
+
   // Exercises ---------------------------------------------------------------
   listExercises(trainingId: number): Observable<Exercise[]> {
     return this.http.get<Exercise[]>(`/api/trainings/${trainingId}/exercises`);
@@ -82,6 +94,12 @@ export class ApiService {
    * transcricao). `kind` nao e editavel. */
   updateExercise(id: number, request: UpdateExerciseRequest): Observable<Exercise> {
     return this.http.patch<Exercise>(`/api/exercises/${id}`, request);
+  }
+
+  /** Apaga o exercicio e seus trechos marcados em cascata. Responde 409 se houver
+   * execucao com log deste exercicio. */
+  deleteExercise(id: number): Observable<void> {
+    return this.http.delete<void>(`/api/exercises/${id}`);
   }
 
   addPassage(exerciseId: number, request: MarkedPassageRequest): Observable<MarkedPassage> {

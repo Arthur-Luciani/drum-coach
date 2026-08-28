@@ -45,13 +45,15 @@ public final class RepertoireItem {
 	}
 
 	/**
-	 * Cria um novo item de repertorio ainda sem id (a persistir), com seus links. Comeca
-	 * sempre em {@link RepertoireItemStatus#NOT_STARTED}.
+	 * Cria um novo item de repertorio ainda sem id (a persistir), com seus links.
+	 * {@code status} nulo assume {@link RepertoireItemStatus#NOT_STARTED}.
 	 */
-	public static RepertoireItem createNew(String songTitle, String artist, Integer targetBpm, Integer currentBpm,
-			String notes, List<RepertoireLink> links, Origin origin, Instant now) {
-		return new RepertoireItem(null, songTitle, artist, RepertoireItemStatus.NOT_STARTED, targetBpm, currentBpm,
-				notes, links, origin, origin, now, now);
+	public static RepertoireItem createNew(String songTitle, String artist, RepertoireItemStatus status,
+			Integer targetBpm, Integer currentBpm, String notes, List<RepertoireLink> links, Origin origin,
+			Instant now) {
+		return new RepertoireItem(null, songTitle, artist,
+				status != null ? status : RepertoireItemStatus.NOT_STARTED, targetBpm, currentBpm, notes, links,
+				origin, origin, now, now);
 	}
 
 	/** Reconstroi um item ja existente (vindo da persistencia), com seus links. */

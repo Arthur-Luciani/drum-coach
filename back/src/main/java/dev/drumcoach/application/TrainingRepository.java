@@ -19,4 +19,7 @@ public interface TrainingRepository {
 	List<Training> findByGoalId(long goalId);
 
 	Optional<Training> findById(long id);
+
+	/** Remove o treino pelo id. Assume que os filhos (exercicios) ja foram removidos. */
+	void deleteById(long id);
 }

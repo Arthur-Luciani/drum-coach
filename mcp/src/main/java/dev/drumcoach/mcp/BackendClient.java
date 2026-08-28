@@ -88,6 +88,11 @@ public class BackendClient {
 			int targetDurationMinutes, Integer targetRepetitions, int orderIndex) {
 	}
 
+	/** Corpo de {@code PATCH /api/trainings/{id}}: todo campo {@code null} mantem o atual. */
+	private record UpdateTrainingRequestDto(String name, String description, Integer targetDurationMinutes,
+			Integer targetRepetitions, Long goalId, Integer orderIndex) {
+	}
+
 	/**
 	 * Espelha {@code presentation.web.ExerciseResponse}. {@code kind} e {@code TOCA_JUNTO}
 	 * ou {@code TRANSCRICAO} (ver ADR-0011); {@code pattern} volta como objeto JSON (um
@@ -110,8 +115,12 @@ public class BackendClient {
 			String videoFilePath, int orderIndex) {
 	}
 
-	/** Corpo de {@code PATCH /api/exercises/{id}}: nao envia {@code kind} (imutavel). */
-	private record UpdateExerciseRequestDto(Object pattern, String howToExecute) {
+	/**
+	 * Corpo de {@code PATCH /api/exercises/{id}}: todo campo {@code null} mantem o atual;
+	 * nao envia {@code kind} (imutavel). {@code pattern} substitui o padrao inteiro.
+	 */
+	private record UpdateExerciseRequestDto(String name, String exerciseType, String howToExecute, Object pattern,
+			Integer targetBpm, Integer targetDurationSeconds, Integer orderIndex) {
 	}
 
 	private record MarkedPassageRequestDto(Integer fromSeconds, Integer toSeconds, String label) {
@@ -162,7 +171,7 @@ public class BackendClient {
 			String createdAt, String updatedAt) {
 	}
 
-	private record CreateRepertoireItemRequestDto(String songTitle, String artist, Integer targetBpm,
+	private record CreateRepertoireItemRequestDto(String songTitle, String artist, String status, Integer targetBpm,
 			Integer currentBpm, String notes, List<RepertoireLinkRequestDto> links) {
 	}
 
@@ -231,6 +240,22 @@ public class BackendClient {
 				TrainingDto.class, "POST /api/trainings");
 	}
 
+	/** {@code PATCH /api/trainings/{id}} - edicao parcial; todo argumento {@code null} mantem o atual. */
+	public TrainingDto updateTraining(long id, String name, String description, Integer targetDurationMinutes,
+			Integer targetRepetitions, Long goalId, Integer orderIndex) throws IOException, InterruptedException {
+		return patch("/api/trainings/" + id, new UpdateTrainingRequestDto(name, description, targetDurationMinutes,
+				targetRepetitions, goalId, orderIndex), TrainingDto.class, "PATCH /api/trainings/" + id);
+	}
+
+	/**
+	 * {@code DELETE /api/trainings/{id}} - apaga o treino e, em cascata, seus exercicios e
+	 * trechos marcados. O back responde 409 (propagado como {@link BackendException}) se
+	 * houver execucoes registradas neste treino.
+	 */
+	public void deleteTraining(long id) throws IOException, InterruptedException {
+		delete("/api/trainings/" + id, "DELETE /api/trainings/" + id);
+	}
+
 	// ===================== Exercise =====================
 
 	public ExerciseDto[] listExercises(long trainingId) throws IOException, InterruptedException {
@@ -261,15 +286,25 @@ public class BackendClient {
 	}
 
 	/**
-	 * {@code PATCH /api/exercises/{id}} - substitui o {@code pattern} pelo documento inteiro
-	 * informado (nao incremental) e, opcionalmente, a nota livre {@code howToExecute}. Nao
-	 * envia {@code kind} (imutavel). O back re-valida o pattern e responde 400 (com
-	 * mensagem no corpo) se estiver malformado.
+	 * {@code PATCH /api/exercises/{id}} - edicao parcial de qualquer campo editavel; todo
+	 * argumento {@code null} mantem o atual. {@code pattern}, quando presente, substitui o
+	 * padrao inteiro (nao incremental) e e re-validado pelo back (400 com mensagem se
+	 * malformado). Nao envia {@code kind} (imutavel).
 	 */
-	public ExerciseDto updateExercisePattern(long id, Object pattern, String howToExecute)
+	public ExerciseDto updateExercise(long id, String name, String exerciseType, String howToExecute, Object pattern,
+			Integer targetBpm, Integer targetDurationSeconds, Integer orderIndex)
 			throws IOException, InterruptedException {
-		return patch("/api/exercises/" + id, new UpdateExerciseRequestDto(pattern, howToExecute), ExerciseDto.class,
-				"PATCH /api/exercises/" + id);
+		return patch("/api/exercises/" + id, new UpdateExerciseRequestDto(name, exerciseType, howToExecute, pattern,
+				targetBpm, targetDurationSeconds, orderIndex), ExerciseDto.class, "PATCH /api/exercises/" + id);
+	}
+
+	/**
+	 * {@code DELETE /api/exercises/{id}} - apaga o exercicio e seus trechos marcados em
+	 * cascata. O back responde 409 (propagado como {@link BackendException}) se houver
+	 * execucao com log deste exercicio.
+	 */
+	public void deleteExercise(long id) throws IOException, InterruptedException {
+		delete("/api/exercises/" + id, "DELETE /api/exercises/" + id);
 	}
 
 	/** {@code POST /api/exercises/{id}/passages} - adiciona um trecho marcado ao exercicio. */
@@ -342,12 +377,12 @@ public class BackendClient {
 		return get("/api/repertoire-items", RepertoireItemDto[].class);
 	}
 
-	public RepertoireItemDto createRepertoireItem(String songTitle, String artist, Integer targetBpm,
+	public RepertoireItemDto createRepertoireItem(String songTitle, String artist, String status, Integer targetBpm,
 			Integer currentBpm, String notes, List<RepertoireLinkInput> links) throws IOException, InterruptedException {
 		List<RepertoireLinkRequestDto> linkDtos = links == null ? List.of()
 				: links.stream().map(link -> new RepertoireLinkRequestDto(link.url(), link.label())).toList();
 		return post("/api/repertoire-items",
-				new CreateRepertoireItemRequestDto(songTitle, artist, targetBpm, currentBpm, notes, linkDtos),
+				new CreateRepertoireItemRequestDto(songTitle, artist, status, targetBpm, currentBpm, notes, linkDtos),
 				RepertoireItemDto.class, "POST /api/repertoire-items");
 	}
 
@@ -437,6 +472,19 @@ public class BackendClient {
 		}
 		requireSuccess(response, call);
 		return parse(response.body(), type, call);
+	}
+
+	private void delete(String path, String call) throws IOException, InterruptedException {
+		HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + path))
+			.header(ACTOR_HEADER, ACTOR_VALUE)
+			.timeout(Duration.ofSeconds(10))
+			.DELETE()
+			.build();
+		HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+		if (response.statusCode() == 404) {
+			throw new BackendException(call + " respondeu 404 (recurso nao encontrado).");
+		}
+		requireSuccess(response, call);
 	}
 
 	private URI uri(String path, Map<String, String> queryParams) {

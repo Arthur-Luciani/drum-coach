@@ -8,4 +8,6 @@ import org.springframework.data.repository.CrudRepository;
 interface SpringDataExerciseRepository extends CrudRepository<ExerciseEntity, Long> {
 
 	List<ExerciseEntity> findByTrainingId(long trainingId);
+
+	void deleteByTrainingId(long trainingId);
 }

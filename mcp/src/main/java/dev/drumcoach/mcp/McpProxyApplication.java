@@ -128,9 +128,15 @@ public final class McpProxyApplication {
 					+ "FLUXO DO PATTERN: comece por list_pattern_presets() (groove-4-4, paradiddle, shuffle) e ajuste "
 					+ "a partir de um preset em vez de montar do zero. Para editar um pattern existente: get_exercise "
 					+ "(mostra kind, o pattern atual em JSON e os trechos) -> edite o documento inteiro -> "
-					+ "update_exercise_pattern (envia o pattern COMPLETO, nao um diff). add_exercise_to_training e os "
-					+ "exercicios inline de add_training_to_goal / generate_training_from_lesson agora pedem 'kind' e "
-					+ "aceitam 'pattern' opcional.\n\n"
+					+ "update_exercise (campo 'pattern' com o documento COMPLETO, nao um diff). "
+					+ "add_exercise_to_training e os exercicios inline de add_training_to_goal / "
+					+ "generate_training_from_lesson agora pedem 'kind' e aceitam 'pattern' opcional.\n\n"
+					+ "EDICAO E REMOCAO: treino e exercicio tem update e delete completos. update_training e "
+					+ "update_exercise editam qualquer campo (o 'kind' do exercicio continua imutavel). "
+					+ "delete_training remove o treino com seus exercicios/trechos em cascata; delete_exercise remove "
+					+ "o exercicio com seus trechos. Os dois deletes FALHAM com erro 409 quando ha execucao "
+					+ "registrada vinculada (ao treino) ou execucao com log (do exercicio) - o historico real de "
+					+ "pratica nao some junto, entao remova as execucoes antes ou mantenha o registro.\n\n"
 					+ "O back (" + backendUrl + ") precisa estar rodando para as tools funcionarem (exceto o "
 					+ "diagnostico de health_check, que reporta a falha de forma amigavel).")
 			.capabilities(ServerCapabilities.builder().tools(true).build())
@@ -151,11 +157,12 @@ public final class McpProxyApplication {
 				healthCheckTool(backendClient),
 				// Escrita
 				createGoalTool(backendClient), updateGoalProgressTool(backendClient), focusGoalTool(backendClient),
-				addTrainingToGoalTool(backendClient), addExerciseToTrainingTool(backendClient),
-				updateExercisePatternTool(backendClient), addMarkedPassageTool(backendClient),
-				recordExecutionTool(backendClient), recordLessonTool(backendClient),
-				generateTrainingFromLessonTool(backendClient), addRepertoireItemTool(backendClient),
-				updateRepertoireItemTool(backendClient));
+				addTrainingToGoalTool(backendClient), updateTrainingTool(backendClient),
+				deleteTrainingTool(backendClient), addExerciseToTrainingTool(backendClient),
+				updateExerciseTool(backendClient), deleteExerciseTool(backendClient),
+				addMarkedPassageTool(backendClient), recordExecutionTool(backendClient),
+				recordLessonTool(backendClient), generateTrainingFromLessonTool(backendClient),
+				addRepertoireItemTool(backendClient), updateRepertoireItemTool(backendClient));
 	}
 
 	// ===================== Schemas comuns =====================
@@ -365,7 +372,7 @@ public final class McpProxyApplication {
 					"Busca um exercicio pelo id (GET /api/exercises/{id}) e mostra, de forma legivel, kind, "
 							+ "exerciseType, howToExecute, o BPM/duracao alvo, o 'pattern' completo em JSON (quando "
 							+ "TOCA_JUNTO) e os trechos marcados (quando TRANSCRICAO). E a leitura usada para editar um "
-							+ "pattern: get_exercise -> editar o JSON -> update_exercise_pattern.")
+							+ "pattern: get_exercise -> editar o JSON -> update_exercise.")
 			.inputSchema(schema)
 			.build();
 
@@ -549,7 +556,7 @@ public final class McpProxyApplication {
 					"Sem parametros. Lista pontos de partida nomeados para o 'pattern' de um exercicio TOCA_JUNTO "
 							+ "(groove-4-4, paradiddle, shuffle) - cada um com nome, descricao e o objeto JSON do "
 							+ "pattern ja valido. Nao ha endpoint no back: os presets sao embutidos no proxy. Use um "
-							+ "deles como base em add_exercise_to_training / update_exercise_pattern em vez de montar "
+							+ "deles como base em add_exercise_to_training / update_exercise em vez de montar "
 							+ "o documento do zero.")
 			.inputSchema(NO_ARGS_SCHEMA)
 			.build();
@@ -817,27 +824,107 @@ public final class McpProxyApplication {
 		}).build();
 	}
 
-	private static McpServerFeatures.SyncToolSpecification updateExercisePatternTool(BackendClient backendClient) {
+	private static McpServerFeatures.SyncToolSpecification updateTrainingTool(BackendClient backendClient) {
 		JsonSchema schema = JsonSchema.builder()
 			.type("object")
-			.properties(Map.of("exerciseId", intProp("Id do exercicio TOCA_JUNTO a atualizar (obrigatorio)."),
-					"pattern", patternProp("Documento COMPLETO do padrao tocavel como objeto JSON (obrigatorio) - "
-							+ "nao e um diff/patch incremental, e o padrao inteiro que substitui o atual. Chaves: "
-							+ "version, timeSignature [num,den], stepsPerBeat, tuplet, bars, voices "
-							+ "(crash/ride/hihat/hiTom/midTom/floorTom/snare/kick), hits {voz:[steps]}, accents/"
-							+ "sticking opcionais. total = bars*num*stepsPerBeat; steps 0-based em [0,total)."),
-					"howToExecute", stringProp("Nota livre de execucao (opcional; se omitido, mantem a atual).")))
-			.required(List.of("exerciseId", "pattern"))
+			.properties(Map.of("trainingId", intProp("Id do treino a atualizar (obrigatorio)."), "name",
+					stringProp("Novo nome (opcional - mantem o atual se omitido)."), "description",
+					stringProp("Nova descricao (opcional)."), "targetDurationMinutes",
+					intProp("Nova duracao alvo em minutos (opcional)."), "targetRepetitions",
+					intProp("Novas repeticoes alvo (opcional)."), "goalId",
+					intProp("Nova meta a qual o treino pertence (opcional - omitir NAO desvincula, so nao mexe)."),
+					"orderIndex", intProp("Nova posicao do treino (opcional).")))
+			.required(List.of("trainingId"))
 			.additionalProperties(false)
 			.build();
 
-		Tool tool = Tool.builder("update_exercise_pattern")
+		Tool tool = Tool.builder("update_training")
 			.description(
-					"Substitui o 'pattern' de um exercicio TOCA_JUNTO pelo documento JSON inteiro informado (PATCH "
-							+ "/api/exercises/{id}). Fluxo tipico: get_exercise para ler o pattern atual, editar o JSON "
-							+ "completo e reenviar aqui. 'kind' e imutavel e nao e enviado. O back valida a estrutura "
-							+ "e rejeita com erro (400 + mensagem) se algo nao fecha (step fora de [0,total), voz fora "
-							+ "do vocabulario, sticking com tamanho errado, acento sem hit, etc).")
+					"Atualiza parcialmente um treino (PATCH /api/trainings/{id}): name, description, "
+							+ "targetDurationMinutes, targetRepetitions, goalId e/ou orderIndex. Todo campo omitido "
+							+ "fica inalterado. 404 se o id nao existir.")
+			.inputSchema(schema)
+			.build();
+
+		return McpServerFeatures.SyncToolSpecification.builder().tool(tool).callHandler((exchange, request) -> {
+			try {
+				Map<String, Object> args = request.arguments();
+				Long id = requiredLongArg(args, "trainingId");
+				TrainingDto updated = backendClient.updateTraining(id, stringArg(args, "name"),
+						stringArg(args, "description"), intArg(args, "targetDurationMinutes"),
+						intArg(args, "targetRepetitions"), longArg(args, "goalId"), intArg(args, "orderIndex"));
+				return okResult("Treino " + updated.id() + " atualizado: \"" + updated.name()
+						+ "\". lastModifiedBy=" + updated.lastModifiedBy() + ".");
+			}
+			catch (IllegalArgumentException e) {
+				return errorResult(e.getMessage());
+			}
+			catch (Exception e) {
+				return errorResult("Falha ao atualizar treino: " + friendlyMessage(e, backendClient.baseUrl()));
+			}
+		}).build();
+	}
+
+	private static McpServerFeatures.SyncToolSpecification deleteTrainingTool(BackendClient backendClient) {
+		JsonSchema schema = JsonSchema.builder()
+			.type("object")
+			.properties(Map.of("trainingId", intProp("Id do treino a remover (obrigatorio).")))
+			.required(List.of("trainingId"))
+			.additionalProperties(false)
+			.build();
+
+		Tool tool = Tool.builder("delete_training")
+			.description(
+					"Remove um treino e, em cascata, seus exercicios e trechos marcados (DELETE "
+							+ "/api/trainings/{id}). FALHA com erro (409) se houver execucoes registradas vinculadas a "
+							+ "este treino - nesse caso as execucoes precisam ser removidas antes, ou o treino mantido "
+							+ "(o historico real de pratica nao some junto com o template). 404 se o id nao existir.")
+			.inputSchema(schema)
+			.build();
+
+		return McpServerFeatures.SyncToolSpecification.builder().tool(tool).callHandler((exchange, request) -> {
+			try {
+				Long id = requiredLongArg(request.arguments(), "trainingId");
+				backendClient.deleteTraining(id);
+				return okResult("Treino " + id + " removido (com seus exercicios e trechos).");
+			}
+			catch (IllegalArgumentException e) {
+				return errorResult(e.getMessage());
+			}
+			catch (Exception e) {
+				return errorResult("Falha ao remover treino: " + friendlyMessage(e, backendClient.baseUrl()));
+			}
+		}).build();
+	}
+
+	private static McpServerFeatures.SyncToolSpecification updateExerciseTool(BackendClient backendClient) {
+		JsonSchema schema = JsonSchema.builder()
+			.type("object")
+			.properties(Map.ofEntries(
+					Map.entry("exerciseId", intProp("Id do exercicio a atualizar (obrigatorio).")),
+					Map.entry("name", stringProp("Novo nome (opcional - mantem o atual se omitido).")),
+					Map.entry("exerciseType", stringProp("Novo tipo, texto livre (opcional).")),
+					Map.entry("howToExecute", stringProp("Nova nota livre de execucao (opcional).")),
+					Map.entry("targetBpm", intProp("Novo BPM alvo (opcional).")),
+					Map.entry("targetDurationSeconds", intProp("Nova duracao alvo em segundos (opcional).")),
+					Map.entry("orderIndex", intProp("Nova posicao do exercicio no treino (opcional).")),
+					Map.entry("pattern", patternProp("Documento COMPLETO do padrao tocavel como objeto JSON "
+							+ "(opcional, so em TOCA_JUNTO) - substitui o padrao INTEIRO, nao e um diff. Chaves: "
+							+ "version, timeSignature [num,den], stepsPerBeat, tuplet, bars, voices "
+							+ "(crash/ride/hihat/hiTom/midTom/floorTom/snare/kick), hits {voz:[steps]}, accents/"
+							+ "sticking opcionais. total = bars*num*stepsPerBeat; steps 0-based em [0,total)."))))
+			.required(List.of("exerciseId"))
+			.additionalProperties(false)
+			.build();
+
+		Tool tool = Tool.builder("update_exercise")
+			.description(
+					"Edita qualquer campo de um exercicio existente (PATCH /api/exercises/{id}): name, exerciseType, "
+							+ "howToExecute, targetBpm, targetDurationSeconds, orderIndex e/ou pattern. Todo campo "
+							+ "omitido fica inalterado. 'pattern' substitui o padrao INTEIRO (nao e um diff) e so vale "
+							+ "em TOCA_JUNTO - fluxo: get_exercise para ler o pattern atual, editar o JSON completo e "
+							+ "reenviar. 'kind' e IMUTAVEL e nao pode ser alterado aqui. O back valida a estrutura do "
+							+ "pattern e rejeita com erro (400 + mensagem) se algo nao fecha. 404 se o id nao existir.")
 			.inputSchema(schema)
 			.build();
 
@@ -846,19 +933,52 @@ public final class McpProxyApplication {
 				Map<String, Object> args = request.arguments();
 				Long id = requiredLongArg(args, "exerciseId");
 				Object pattern = args == null ? null : args.get("pattern");
-				if (!(pattern instanceof Map<?, ?>)) {
-					return errorResult("O parametro 'pattern' e obrigatorio e deve ser o objeto JSON do padrao "
+				if (pattern != null && !(pattern instanceof Map<?, ?>)) {
+					return errorResult("O parametro 'pattern', quando informado, deve ser o objeto JSON do padrao "
 							+ "completo.");
 				}
-				ExerciseDto updated = backendClient.updateExercisePattern(id, pattern, stringArg(args, "howToExecute"));
-				return okResult("Pattern do exercicio " + updated.id() + " (\"" + updated.name()
+				ExerciseDto updated = backendClient.updateExercise(id, stringArg(args, "name"),
+						stringArg(args, "exerciseType"), stringArg(args, "howToExecute"), pattern,
+						intArg(args, "targetBpm"), intArg(args, "targetDurationSeconds"), intArg(args, "orderIndex"));
+				return okResult("Exercicio " + updated.id() + " (\"" + updated.name()
 						+ "\") atualizado. lastModifiedBy=" + updated.lastModifiedBy() + ".");
 			}
 			catch (IllegalArgumentException e) {
 				return errorResult(e.getMessage());
 			}
 			catch (Exception e) {
-				return errorResult("Falha ao atualizar pattern: " + friendlyMessage(e, backendClient.baseUrl()));
+				return errorResult("Falha ao atualizar exercicio: " + friendlyMessage(e, backendClient.baseUrl()));
+			}
+		}).build();
+	}
+
+	private static McpServerFeatures.SyncToolSpecification deleteExerciseTool(BackendClient backendClient) {
+		JsonSchema schema = JsonSchema.builder()
+			.type("object")
+			.properties(Map.of("exerciseId", intProp("Id do exercicio a remover (obrigatorio).")))
+			.required(List.of("exerciseId"))
+			.additionalProperties(false)
+			.build();
+
+		Tool tool = Tool.builder("delete_exercise")
+			.description(
+					"Remove um exercicio e seus trechos marcados em cascata (DELETE /api/exercises/{id}). FALHA com "
+							+ "erro (409) se houver alguma execucao com log deste exercicio - nesse caso as execucoes "
+							+ "precisam ser removidas antes, ou o exercicio mantido. 404 se o id nao existir.")
+			.inputSchema(schema)
+			.build();
+
+		return McpServerFeatures.SyncToolSpecification.builder().tool(tool).callHandler((exchange, request) -> {
+			try {
+				Long id = requiredLongArg(request.arguments(), "exerciseId");
+				backendClient.deleteExercise(id);
+				return okResult("Exercicio " + id + " removido (com seus trechos marcados).");
+			}
+			catch (IllegalArgumentException e) {
+				return errorResult(e.getMessage());
+			}
+			catch (Exception e) {
+				return errorResult("Falha ao remover exercicio: " + friendlyMessage(e, backendClient.baseUrl()));
 			}
 		}).build();
 	}
@@ -1076,9 +1196,12 @@ public final class McpProxyApplication {
 		JsonSchema schema = JsonSchema.builder()
 			.type("object")
 			.properties(Map.of("songTitle", stringProp("Titulo da musica (obrigatorio)."), "artist",
-					stringProp("Artista/banda (opcional)."), "targetBpm", intProp("BPM alvo (opcional)."),
-					"currentBpm", intProp("BPM atual (opcional)."), "notes", stringProp("Notas (opcional)."),
-					"links", arrayProp("Links de referencia (opcional).", linkItemSchema())))
+					stringProp("Artista/banda (opcional)."), "status",
+					enumProp("Status inicial (opcional - default NOT_STARTED). Passe o status certo aqui em vez de "
+							+ "criar e logo chamar update_repertoire_item.", "NOT_STARTED", "LEARNING", "MASTERED"),
+					"targetBpm", intProp("BPM alvo (opcional)."), "currentBpm", intProp("BPM atual (opcional)."),
+					"notes", stringProp("Notas (opcional)."), "links",
+					arrayProp("Links de referencia (opcional).", linkItemSchema())))
 			.required(List.of("songTitle"))
 			.additionalProperties(false)
 			.build();
@@ -1087,7 +1210,8 @@ public final class McpProxyApplication {
 			.description(
 					"Adiciona uma musica ao repertorio - uma lista independente de Metas/Treinos, so para "
 							+ "acompanhar musicas que o usuario esta aprendendo (status, bpm atual/alvo, links de "
-							+ "referencia). Aceita varios links de uma vez.")
+							+ "referencia). Aceita 'status' inicial (NOT_STARTED|LEARNING|MASTERED, default "
+							+ "NOT_STARTED) e varios links de uma vez.")
 			.inputSchema(schema)
 			.build();
 
@@ -1097,7 +1221,8 @@ public final class McpProxyApplication {
 				String songTitle = requiredStringArg(args, "songTitle");
 				List<RepertoireLinkInput> links = parseLinks(args.get("links"));
 				RepertoireItemDto created = backendClient.createRepertoireItem(songTitle, stringArg(args, "artist"),
-						intArg(args, "targetBpm"), intArg(args, "currentBpm"), stringArg(args, "notes"), links);
+						stringArg(args, "status"), intArg(args, "targetBpm"), intArg(args, "currentBpm"),
+						stringArg(args, "notes"), links);
 				return okResult("Item de repertorio criado (id " + created.id() + "): \"" + created.songTitle()
 						+ "\" - status " + created.status() + ".");
 			}
@@ -1383,7 +1508,7 @@ public final class McpProxyApplication {
 			sb.append("pattern (JSON):\n").append(prettyJson(e.pattern())).append('\n');
 		}
 		else if ("TOCA_JUNTO".equals(e.kind())) {
-			sb.append("pattern: (ainda sem padrao - use update_exercise_pattern para definir)\n");
+			sb.append("pattern: (ainda sem padrao - use update_exercise para definir)\n");
 		}
 		List<MarkedPassageDto> passages = e.passages();
 		if (passages != null && !passages.isEmpty()) {

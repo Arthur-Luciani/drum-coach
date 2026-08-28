@@ -424,11 +424,11 @@ class BackendIT {
 		long trainingId = createStandaloneTraining(client, "IT update-pattern - " + UUID.randomUUID());
 		long exerciseId = addTocaJuntoExercise(client, trainingId, groovePattern(List.of(0, 8)));
 
-		CallToolResult updateResult = client.callTool(CallToolRequest.builder("update_exercise_pattern")
+		CallToolResult updateResult = client.callTool(CallToolRequest.builder("update_exercise")
 			.arguments(Map.of("exerciseId", exerciseId, "pattern", groovePattern(List.of(0, 4, 8, 12)),
 					"howToExecute", "Bumbo em toda semínima"))
 			.build());
-		assertFalse(Boolean.TRUE.equals(updateResult.isError()), "update_exercise_pattern falhou: " + firstText(updateResult));
+		assertFalse(Boolean.TRUE.equals(updateResult.isError()), "update_exercise falhou: " + firstText(updateResult));
 
 		CallToolResult getResult = client.callTool(
 				CallToolRequest.builder("get_exercise").arguments(Map.of("exerciseId", exerciseId)).build());
@@ -454,7 +454,7 @@ class BackendIT {
 		Map<String, Object> hits = (Map<String, Object>) broken.get("hits");
 		hits.put("hihat", List.of(99)); // step fora de [0, 16)
 
-		CallToolResult result = client.callTool(CallToolRequest.builder("update_exercise_pattern")
+		CallToolResult result = client.callTool(CallToolRequest.builder("update_exercise")
 			.arguments(Map.of("exerciseId", exerciseId, "pattern", broken))
 			.build());
 
@@ -514,6 +514,84 @@ class BackendIT {
 			assertFalse(Boolean.TRUE.equals(addResult.isError()),
 					"preset '" + preset + "' nao passou na validacao do back: " + firstText(addResult));
 		}
+	}
+
+	// ===================== Fase 5: update/delete de treino e exercicio, status no repertorio =====================
+
+	@Test
+	void updateTraining_changesASingleField() throws IOException, InterruptedException {
+		McpSyncClient client = startClient();
+		long trainingId = createStandaloneTraining(client, "IT update-training - " + UUID.randomUUID());
+
+		CallToolResult result = client.callTool(CallToolRequest.builder("update_training")
+			.arguments(Map.of("trainingId", trainingId, "targetRepetitions", 7))
+			.build());
+		assertFalse(Boolean.TRUE.equals(result.isError()), "update_training falhou: " + firstText(result));
+
+		Map<String, Object> training = findById("/api/trainings", trainingId);
+		assertNotNull(training);
+		assertEquals(7, ((Number) training.get("targetRepetitions")).intValue());
+		assertEquals("CLAUDE", training.get("lastModifiedBy"));
+	}
+
+	@Test
+	void deleteTraining_ofANewEmptyTraining_removesIt() throws IOException, InterruptedException {
+		McpSyncClient client = startClient();
+		long trainingId = createStandaloneTraining(client, "IT delete-training - " + UUID.randomUUID());
+
+		CallToolResult result = client.callTool(
+				CallToolRequest.builder("delete_training").arguments(Map.of("trainingId", trainingId)).build());
+		assertFalse(Boolean.TRUE.equals(result.isError()), "delete_training falhou: " + firstText(result));
+
+		assertNull(findById("/api/trainings", trainingId), "treino deveria ter sido removido");
+	}
+
+	@Test
+	void updateExercise_changesName() throws IOException, InterruptedException {
+		McpSyncClient client = startClient();
+		long trainingId = createStandaloneTraining(client, "IT update-exercise-name - " + UUID.randomUUID());
+		long exerciseId = addTocaJuntoExercise(client, trainingId, groovePattern(List.of(0, 8)));
+
+		CallToolResult result = client.callTool(CallToolRequest.builder("update_exercise")
+			.arguments(Map.of("exerciseId", exerciseId, "name", "Groove renomeado", "targetBpm", 105))
+			.build());
+		assertFalse(Boolean.TRUE.equals(result.isError()), "update_exercise falhou: " + firstText(result));
+
+		Map<String, Object> exercise = getJson("/api/exercises/" + exerciseId);
+		assertEquals("Groove renomeado", exercise.get("name"));
+		assertEquals(105, ((Number) exercise.get("targetBpm")).intValue());
+		assertEquals("TOCA_JUNTO", exercise.get("kind"));
+	}
+
+	@Test
+	void deleteExercise_removesIt() throws IOException, InterruptedException {
+		McpSyncClient client = startClient();
+		long trainingId = createStandaloneTraining(client, "IT delete-exercise - " + UUID.randomUUID());
+		long exerciseId = addTocaJuntoExercise(client, trainingId, groovePattern(List.of(0, 8)));
+
+		CallToolResult result = client.callTool(
+				CallToolRequest.builder("delete_exercise").arguments(Map.of("exerciseId", exerciseId)).build());
+		assertFalse(Boolean.TRUE.equals(result.isError()), "delete_exercise falhou: " + firstText(result));
+
+		List<Map<String, Object>> exercises = getJsonList("/api/trainings/" + trainingId + "/exercises");
+		assertTrue(exercises.stream().noneMatch(e -> exerciseId == ((Number) e.get("id")).longValue()),
+				"exercicio deveria ter sido removido: " + exercises);
+	}
+
+	@Test
+	void addRepertoireItem_withStatus_createsAlreadyInThatStatus() throws IOException, InterruptedException {
+		McpSyncClient client = startClient();
+		String uniqueTitle = "IT repertoire-status - " + UUID.randomUUID();
+
+		CallToolResult addResult = client.callTool(CallToolRequest.builder("add_repertoire_item")
+			.arguments(Map.of("songTitle", uniqueTitle, "artist", "Test Band", "status", "LEARNING"))
+			.build());
+		assertFalse(Boolean.TRUE.equals(addResult.isError()), firstText(addResult));
+		assertTrue(firstText(addResult).contains("LEARNING"), "resposta deveria confirmar status LEARNING: " + firstText(addResult));
+
+		Map<String, Object> found = findByTitle("/api/repertoire-items", "songTitle", uniqueTitle);
+		assertNotNull(found);
+		assertEquals("LEARNING", found.get("status"));
 	}
 
 	// ===================== Helpers =====================

@@ -70,4 +70,22 @@ public class ExerciseRepositoryImpl implements ExerciseRepository {
 					"ExercisePassage " + passageId + " nao encontrado no exercicio " + exerciseId));
 		passageJdbcRepository.delete(entity);
 	}
+
+	@Override
+	@Transactional
+	public void deleteById(long id) {
+		passageJdbcRepository.deleteByExerciseId(id);
+		jdbcRepository.deleteById(id);
+	}
+
+	@Override
+	@Transactional
+	public void deleteByTrainingId(long trainingId) {
+		for (ExerciseEntity exercise : jdbcRepository.findByTrainingId(trainingId)) {
+			if (exercise.id() != null) {
+				passageJdbcRepository.deleteByExerciseId(exercise.id());
+			}
+		}
+		jdbcRepository.deleteByTrainingId(trainingId);
+	}
 }

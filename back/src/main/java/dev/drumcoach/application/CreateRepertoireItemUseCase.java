@@ -33,8 +33,8 @@ public class CreateRepertoireItemUseCase {
 			.stream()
 			.map(link -> RepertoireLink.createNew(link.url(), link.label(), now))
 			.toList();
-		RepertoireItem item = RepertoireItem.createNew(command.songTitle(), command.artist(), command.targetBpm(),
-				command.currentBpm(), command.notes(), links, origin, now);
+		RepertoireItem item = RepertoireItem.createNew(command.songTitle(), command.artist(), command.status(),
+				command.targetBpm(), command.currentBpm(), command.notes(), links, origin, now);
 		return repertoireItemRepository.save(item);
 	}
 }

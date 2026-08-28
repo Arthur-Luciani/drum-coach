@@ -43,11 +43,13 @@ import io.modelcontextprotocol.spec.McpSchema.Tool;
 class McpProxyStdioTest {
 
 	/**
-	 * As 25 tools esperadas. Fase 3 (ADR-0009): modelo Treino direto na Meta, sem Plano -
+	 * As 28 tools esperadas. Fase 3 (ADR-0009): modelo Treino direto na Meta, sem Plano -
 	 * nenhuma tool baseada em Plano deve aparecer aqui. Fase 4b (ADR-0011): o eixo
 	 * {@code kind} do exercicio e o {@code pattern} tocavel trazem 4 tools novas
 	 * ({@code get_exercise}, {@code list_pattern_presets}, {@code update_exercise_pattern},
-	 * {@code add_marked_passage}).
+	 * {@code add_marked_passage}). Fase 5: {@code update_exercise_pattern} vira
+	 * {@code update_exercise} (edita qualquer campo) e entram {@code delete_exercise},
+	 * {@code update_training} e {@code delete_training} (-1 +4).
 	 */
 	private static final Set<String> EXPECTED_TOOL_NAMES = Set.of(
 			// leitura
@@ -55,9 +57,10 @@ class McpProxyStdioTest {
 			"list_lessons", "get_lesson", "list_repertoire", "get_repertoire_item", "list_pattern_presets",
 			"get_coach_briefing", "health_check",
 			// escrita
-			"create_goal", "update_goal_progress", "focus_goal", "add_training_to_goal",
-			"add_exercise_to_training", "update_exercise_pattern", "add_marked_passage", "record_execution",
-			"record_lesson", "generate_training_from_lesson", "add_repertoire_item", "update_repertoire_item");
+			"create_goal", "update_goal_progress", "focus_goal", "add_training_to_goal", "update_training",
+			"delete_training", "add_exercise_to_training", "update_exercise", "delete_exercise", "add_marked_passage",
+			"record_execution", "record_lesson", "generate_training_from_lesson", "add_repertoire_item",
+			"update_repertoire_item");
 
 	/** Tools baseadas no conceito de Plano, removido pelo ADR-0009 - nao devem mais existir. */
 	private static final Set<String> REMOVED_PLAN_TOOL_NAMES = Set.of("list_active_plans", "get_plan_details",
@@ -228,13 +231,15 @@ class McpProxyStdioTest {
 		assertNotNull(getExercise, "get_exercise deveria estar registrada");
 		assertTrue(((List<String>) getExercise.inputSchema().get("required")).contains("exerciseId"));
 
-		Tool updatePattern = byName.get("update_exercise_pattern");
-		assertNotNull(updatePattern, "update_exercise_pattern deveria estar registrada");
-		List<String> updateRequired = (List<String>) updatePattern.inputSchema().get("required");
-		assertTrue(updateRequired.contains("exerciseId"), "faltou 'exerciseId' em update_exercise_pattern: " + updateRequired);
-		assertTrue(updateRequired.contains("pattern"), "faltou 'pattern' em update_exercise_pattern: " + updateRequired);
-		Map<String, Object> updateProps = (Map<String, Object>) updatePattern.inputSchema().get("properties");
-		assertTrue(updateProps.containsKey("howToExecute"), "faltou a prop opcional 'howToExecute'");
+		Tool updateExercise = byName.get("update_exercise");
+		assertNotNull(updateExercise, "update_exercise deveria estar registrada");
+		List<String> updateRequired = (List<String>) updateExercise.inputSchema().get("required");
+		assertTrue(updateRequired.contains("exerciseId"), "faltou 'exerciseId' em update_exercise: " + updateRequired);
+		assertFalse(updateRequired.contains("pattern"), "'pattern' agora e opcional em update_exercise: " + updateRequired);
+		Map<String, Object> updateProps = (Map<String, Object>) updateExercise.inputSchema().get("properties");
+		assertTrue(updateProps.keySet().containsAll(List.of("name", "exerciseType", "howToExecute", "targetBpm",
+				"targetDurationSeconds", "orderIndex", "pattern")),
+				"update_exercise deveria expor todos os campos editaveis: " + updateProps.keySet());
 
 		Tool addPassage = byName.get("add_marked_passage");
 		assertNotNull(addPassage, "add_marked_passage deveria estar registrada");
@@ -284,16 +289,61 @@ class McpProxyStdioTest {
 	}
 
 	@Test
-	void updateExercisePatternWithoutPatternReturnsFriendlyError() {
+	void updateExerciseWithoutExerciseIdReturnsFriendlyError() {
 		McpSyncClient client = startClient("http://localhost:1");
 		client.initialize();
 
-		CallToolResult result = client.callTool(CallToolRequest.builder("update_exercise_pattern")
-			.arguments(Map.of("exerciseId", 1))
+		CallToolResult result = client.callTool(CallToolRequest.builder("update_exercise")
+			.arguments(Map.of("name", "novo nome"))
 			.build());
 
 		assertNotNull(result);
-		assertTrue(Boolean.TRUE.equals(result.isError()), "esperava isError=true por falta de 'pattern'");
+		assertTrue(Boolean.TRUE.equals(result.isError()), "esperava isError=true por falta de 'exerciseId'");
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void phase5EditAndDeleteToolsExposeTheirRequiredFields() {
+		McpSyncClient client = startClient("http://localhost:1");
+		client.initialize();
+
+		Map<String, Tool> byName = client.listTools()
+			.tools()
+			.stream()
+			.collect(Collectors.toMap(Tool::name, t -> t));
+
+		Tool updateTraining = byName.get("update_training");
+		assertNotNull(updateTraining, "update_training deveria estar registrada");
+		assertTrue(((List<String>) updateTraining.inputSchema().get("required")).contains("trainingId"));
+		assertTrue(((Map<String, Object>) updateTraining.inputSchema().get("properties")).keySet()
+			.containsAll(List.of("name", "description", "targetDurationMinutes", "targetRepetitions", "goalId",
+					"orderIndex")));
+
+		Tool deleteTraining = byName.get("delete_training");
+		assertNotNull(deleteTraining, "delete_training deveria estar registrada");
+		assertTrue(((List<String>) deleteTraining.inputSchema().get("required")).contains("trainingId"));
+
+		Tool deleteExercise = byName.get("delete_exercise");
+		assertNotNull(deleteExercise, "delete_exercise deveria estar registrada");
+		assertTrue(((List<String>) deleteExercise.inputSchema().get("required")).contains("exerciseId"));
+
+		Tool addRepertoire = byName.get("add_repertoire_item");
+		Map<String, Object> repertoireProps = (Map<String, Object>) addRepertoire.inputSchema().get("properties");
+		assertTrue(repertoireProps.containsKey("status"), "add_repertoire_item deveria aceitar 'status'");
+	}
+
+	@Test
+	void deleteToolsReportBackendDownAsErrorInsteadOfCrashing() {
+		McpSyncClient client = startClient("http://localhost:1");
+		client.initialize();
+
+		CallToolResult delTraining = client.callTool(
+				CallToolRequest.builder("delete_training").arguments(Map.of("trainingId", 1)).build());
+		assertTrue(Boolean.TRUE.equals(delTraining.isError()), "esperava isError=true com o back fora do ar");
+
+		CallToolResult delExercise = client.callTool(
+				CallToolRequest.builder("delete_exercise").arguments(Map.of("exerciseId", 1)).build());
+		assertTrue(Boolean.TRUE.equals(delExercise.isError()), "esperava isError=true com o back fora do ar");
 	}
 
 	@Test

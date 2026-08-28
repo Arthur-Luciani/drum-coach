@@ -8,4 +8,6 @@ import org.springframework.data.repository.CrudRepository;
 interface SpringDataExecutionExerciseLogRepository extends CrudRepository<ExecutionExerciseLogEntity, Long> {
 
 	List<ExecutionExerciseLogEntity> findByExecutionId(long executionId);
+
+	long countByExerciseId(long exerciseId);
 }

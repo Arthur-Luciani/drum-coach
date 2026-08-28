@@ -8,4 +8,6 @@ import org.springframework.data.repository.CrudRepository;
 interface SpringDataExercisePassageRepository extends CrudRepository<ExercisePassageEntity, Long> {
 
 	List<ExercisePassageEntity> findByExerciseIdOrderByFromSecondsAsc(long exerciseId);
+
+	void deleteByExerciseId(long exerciseId);
 }

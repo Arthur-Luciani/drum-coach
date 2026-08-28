@@ -76,6 +76,17 @@ export interface CreateTrainingRequest {
   orderIndex: number;
 }
 
+/** `PATCH /api/trainings/{id}` - edicao parcial; todo campo `null`/omitido mantem o atual
+ * (inclusive `goalId`: `null` nao desvincula o treino da meta). */
+export interface UpdateTrainingRequest {
+  name?: string | null;
+  description?: string | null;
+  targetDurationMinutes?: number | null;
+  targetRepetitions?: number | null;
+  goalId?: number | null;
+  orderIndex?: number | null;
+}
+
 // ---------------------------------------------------------------------------
 // Exercise
 // ---------------------------------------------------------------------------
@@ -118,11 +129,20 @@ export interface CreateExerciseRequest {
   orderIndex: number;
 }
 
-/** `PATCH /api/exercises/{id}` - edita o padrao tocavel e/ou a nota livre. `kind` nao
- * e editavel (ver ADR-0011). */
+/** `PATCH /api/exercises/{id}` - edicao parcial de qualquer campo editavel; todo campo
+ * `null`/omitido mantem o atual. `pattern` substitui o documento inteiro (nao e um diff).
+ * `kind` NAO e editavel (ver ADR-0011). */
 export interface UpdateExerciseRequest {
-  pattern?: DrumPattern | null;
+  name?: string | null;
+  exerciseType?: string | null;
   howToExecute?: string | null;
+  pattern?: DrumPattern | null;
+  targetBpm?: number | null;
+  targetDurationSeconds?: number | null;
+  videoSourceType?: VideoSourceType | null;
+  videoUrl?: string | null;
+  videoFilePath?: string | null;
+  orderIndex?: number | null;
 }
 
 /** Trecho marcado de uma transcricao (tabela filha `exercise_passage`, ver ADR-0011). */
@@ -291,6 +311,8 @@ export interface RepertoireItem {
 export interface CreateRepertoireItemRequest {
   songTitle: string;
   artist?: string | null;
+  /** Status inicial - `null`/omitido assume `NOT_STARTED`. */
+  status?: RepertoireItemStatus | null;
   targetBpm?: number | null;
   currentBpm?: number | null;
   notes?: string | null;

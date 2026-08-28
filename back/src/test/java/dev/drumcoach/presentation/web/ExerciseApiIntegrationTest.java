@@ -289,4 +289,95 @@ class ExerciseApiIntegrationTest {
 		assertThat(error).isNotNull();
 		assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
+
+	// ===================== Fase 5: PATCH ampliado + DELETE =====================
+
+	private long createSimpleExercise(RestClient client, long trainingId) {
+		Map<String, Object> create = new HashMap<>();
+		create.put("name", "Rulo");
+		create.put("exerciseType", "rudimento");
+		create.put("kind", "TRANSCRICAO");
+		create.put("orderIndex", 0);
+		Map<String, Object> created = client.post()
+			.uri("/api/trainings/{trainingId}/exercises", trainingId)
+			.body(create)
+			.retrieve()
+			.body(MAP);
+		return ((Number) created.get("id")).longValue();
+	}
+
+	@Test
+	void patchUpdatesNameAndTargetBpmLeavingOtherFieldsIntact() {
+		RestClient client = client();
+		long trainingId = createTraining(client);
+		long exerciseId = createSimpleExercise(client, trainingId);
+
+		Map<String, Object> patch = new HashMap<>();
+		patch.put("name", "Rulo de 5");
+		patch.put("targetBpm", 120);
+
+		Map<String, Object> updated = client.patch()
+			.uri("/api/exercises/{id}", exerciseId)
+			.body(patch)
+			.retrieve()
+			.body(MAP);
+		assertThat(updated).isNotNull();
+		assertThat(updated.get("name")).isEqualTo("Rulo de 5");
+		assertThat(updated.get("targetBpm")).isEqualTo(120);
+		assertThat(updated.get("exerciseType")).isEqualTo("rudimento");
+		assertThat(updated.get("kind")).isEqualTo("TRANSCRICAO");
+	}
+
+	@Test
+	void deletesExerciseWithoutLogsReturns204ThenGetIs404() {
+		RestClient client = client();
+		long trainingId = createTraining(client);
+		long exerciseId = createSimpleExercise(client, trainingId);
+
+		var deleteResponse = client.delete()
+			.uri("/api/exercises/{id}", exerciseId)
+			.retrieve()
+			.toBodilessEntity();
+		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+		HttpClientErrorException error = expectHttpError(
+				() -> client.get().uri("/api/exercises/{id}", exerciseId).retrieve().toBodilessEntity());
+		assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void deletingExerciseThatHasAnExecutionLogReturns409() {
+		RestClient client = client();
+		long trainingId = createTraining(client);
+		long exerciseId = createSimpleExercise(client, trainingId);
+
+		client.post()
+			.uri("/api/executions")
+			.body(Map.of("trainingId", trainingId, "executionDate", "2026-08-27", "logs",
+					List.of(Map.of("exerciseId", exerciseId, "achievedBpm", 100))))
+			.retrieve()
+			.toBodilessEntity();
+
+		HttpClientErrorException error = expectHttpError(
+				() -> client.delete().uri("/api/exercises/{id}", exerciseId).retrieve().toBodilessEntity());
+		assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(error.getResponseBodyAsString()).contains("execucao");
+	}
+
+	@Test
+	void deleteAndPatchReturn404ForUnknownExercise() {
+		RestClient client = client();
+
+		HttpClientErrorException deleteError = expectHttpError(
+				() -> client.delete().uri("/api/exercises/{id}", 424242).retrieve().toBodilessEntity());
+		assertThat(deleteError.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+		HttpClientErrorException patchError = expectHttpError(
+				() -> client.patch()
+					.uri("/api/exercises/{id}", 424242)
+					.body(Map.of("name", "x"))
+					.retrieve()
+					.toBodilessEntity());
+		assertThat(patchError.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+	}
 }

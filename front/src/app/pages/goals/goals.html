@@ -32,8 +32,8 @@
           }
 
           <div class="row-card__main">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <a [routerLink]="['/goals', goal.id]" style="font-weight: 600;">{{ goal.title }}</a>
+            <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+              <a [routerLink]="['/goals', goal.id]" style="font-weight: 600; min-width: 0;">{{ goal.title }}</a>
               @if (goal.inFocus) {
                 <app-badge variant="focus" label="em foco" />
               }
@@ -46,7 +46,7 @@
 
           <div class="row-card__side">
             @if (goal.targetMetric) {
-              <span class="mono">{{ goal.targetMetric }}</span>
+              <span class="mono" style="display: inline-block; max-width: 18rem; white-space: normal; text-align: right;">{{ goal.targetMetric }}</span>
             }
             <app-badge [variant]="goal.status" [label]="goalStatusLabel(goal.status)" />
             <a [routerLink]="['/goals', goal.id]" class="icon-btn chevron" aria-label="Ver detalhe da meta">

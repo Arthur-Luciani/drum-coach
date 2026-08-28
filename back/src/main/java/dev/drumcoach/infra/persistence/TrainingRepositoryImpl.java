@@ -39,4 +39,9 @@ public class TrainingRepositoryImpl implements TrainingRepository {
 	public Optional<Training> findById(long id) {
 		return jdbcRepository.findById(id).map(TrainingMapper::toDomain);
 	}
+
+	@Override
+	public void deleteById(long id) {
+		jdbcRepository.deleteById(id);
+	}
 }

@@ -69,6 +69,11 @@ public class ExecutionRepositoryImpl implements ExecutionRepository {
 		return executionJdbcRepository.countByTrainingId(trainingId);
 	}
 
+	@Override
+	public long countExerciseLogsByExerciseId(long exerciseId) {
+		return logJdbcRepository.countByExerciseId(exerciseId);
+	}
+
 	private List<Execution> toDomainWithLogs(Iterable<ExecutionEntity> entities) {
 		return StreamSupport.stream(entities.spliterator(), false).map(this::toDomainWithLogs).toList();
 	}
